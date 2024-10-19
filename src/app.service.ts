@@ -7,22 +7,58 @@ import { UserVerifyEmailDTO } from '../common/dto/users-service/user-verify-emai
 import { UserForgotPasswordDTO } from '../common/dto/users-service/user-forgot-password.dto';
 import { UserResetPasswordDTO } from '../common/dto/users-service/user-reset-password.dto';
 import { UserUpdateDTO } from '../common/dto/users-service/user-update.dto';
+import { RmqContext } from '@nestjs/microservices';
 
 @Injectable()
 export class AppService {
-  async updateUser(data: UserUpdateDTO) {}
+  // Acknowledge the message after successful processing
+  acknowledge(context: RmqContext) {
+    const channel = context.getChannelRef();
+    const originalMessage = context.getMessage();
+    channel.ack(originalMessage);
+  }
 
-  async changeUsername(data: UserChangeUsernameDTO) {}
+  async updateUser(data: UserUpdateDTO, context: RmqContext) {
+    console.log(data)
 
-  async changePassword(data: UserChangePasswordDTO) {}
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
 
-  async changeEmail(data: UserChangeEmailDTO) {}
+    return 100
+  }
 
-  async sendEmailVerificationToken(data: UserSendEmailVerificationTokenDTO) {}
+  async changeUsername(data: UserChangeUsernameDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
 
-  async verifyEmail(data: UserVerifyEmailDTO) {}
+  async changePassword(data: UserChangePasswordDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
 
-  async forgotPassword(data: UserForgotPasswordDTO) {}
+  async changeEmail(data: UserChangeEmailDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
 
-  async resetPassword(data: UserResetPasswordDTO) {}
+  async sendEmailVerificationToken(data: UserSendEmailVerificationTokenDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
+
+  async verifyEmail(data: UserVerifyEmailDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
+
+  async forgotPassword(data: UserForgotPasswordDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
+
+  async resetPassword(data: UserResetPasswordDTO, context: RmqContext) {
+    // Acknowledge the message after successful processing
+    this.acknowledge(context);
+  }
 }
