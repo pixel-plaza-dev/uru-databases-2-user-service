@@ -23,19 +23,19 @@ func (l listenerLogger) buildErrorMessage(message string, err error) string {
 	return strings.Join([]string{l.name, message, err.Error()}, " ")
 }
 
-// FailedToListen logs an error message when the server fails to listen
+// FailedToListen logs an error message when the grpc_server fails to listen
 func (l listenerLogger) FailedToListen(err error) {
 	message := l.buildErrorMessage("Failed to listen", err)
 	log.Fatalf(message)
 }
 
-// ServerStarted logs a success message when the server starts
+// ServerStarted logs a success message when the grpc_server starts
 func (l listenerLogger) ServerStarted(port string) {
 	message := l.buildSuccessMessage("Server started on: " + port)
 	log.Println(message)
 }
 
-// FailedToServe logs an error message when the server fails to serve
+// FailedToServe logs an error message when the grpc_server fails to serve
 func (l listenerLogger) FailedToServe(err error) {
 	message := l.buildErrorMessage("Failed to serve", err)
 	log.Fatalf(message)

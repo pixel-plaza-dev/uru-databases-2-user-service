@@ -167,7 +167,7 @@ func (c *usersServiceClient) DeleteUser(ctx context.Context, in *DeleteUserReque
 	return out, nil
 }
 
-// UsersServiceServer is the server API for UsersService service.
+// UsersServiceServer is the grpc_server API for UsersService service.
 // All implementations must embed UnimplementedUsersServiceServer
 // for forward compatibility.
 type UsersServiceServer interface {
