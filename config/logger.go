@@ -1,16 +1,20 @@
 package config
 
 import (
-	"github.com/pixel-plaza-dev/uru-databases-2-go-service-common/logger"
+	commonLogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/logger"
+	"pixel_plaza/users_service/logger"
 )
 
 var (
 	// ListenerLogger is the logger for the listener
-	ListenerLogger = logger.NewListenerLogger(ListenerLoggerName)
+	ListenerLogger = commonLogger.NewListenerLogger(ListenerLoggerName)
 
 	// EnvironmentLogger is the logger for the environment
-	EnvironmentLogger = logger.NewEnvironmentLogger(EnvironmentLoggerName)
+	EnvironmentLogger = commonLogger.NewEnvironmentLogger(EnvironmentLoggerName)
 
 	// MongoDBLogger is the logger for the MongoDB client
-	MongoDBLogger = logger.NewMongoDbLogger(MongoDbLoggerName)
+	MongoDBLogger = commonLogger.NewMongoDbLogger(MongoDbLoggerName)
+
+	// UsersServiceLogger is the logger for the Users Service server
+	UsersServiceLogger = logger.NewUsersServiceLogger(UsersServiceLoggerName)
 )

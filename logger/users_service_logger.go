@@ -5,10 +5,10 @@ import (
 )
 
 type UsersServiceLogger struct {
-	logger commonLogger.Logger
+	logger *commonLogger.Logger
 }
 
 // NewUsersServiceLogger is the logger for the Users Service server
 func NewUsersServiceLogger(name string) *UsersServiceLogger {
-	return &UsersServiceLogger{logger: commonLogger.Logger{Name: name}}
+	return &UsersServiceLogger{logger: commonLogger.NewLogger(name)}
 }

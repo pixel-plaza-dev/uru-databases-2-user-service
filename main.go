@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/joho/godotenv"
+	customEnvironmentError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/environment"
+	customListenerError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/listener"
 	commonLoader "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/loader"
 	commonMongoDb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 	"google.golang.org/grpc"
@@ -14,32 +16,49 @@ import (
 // Load environment variables
 func init() {
 	if err := godotenv.Load(); err != nil {
-		config.EnvironmentLogger.ErrorLoadingEnvironmentVariables(err)
+		panic(customEnvironmentError.FailedToLoadEnvironmentVariablesError{Err: err})
 	}
 }
 
 func main() {
 	// Get the port and listener port
-	port, listenerPort := commonLoader.LoadServicePort(config.UsersServicePortKey, config.EnvironmentLogger)
+	servicePort, err := commonLoader.LoadServicePort(config.UsersServicePortKey)
+	if err != nil {
+		panic(err)
+	}
+	config.EnvironmentLogger.EnvironmentVariableLoaded(config.UsersServicePortKey)
 
 	// Get the MongoDB URI
-	mongoDbUri := commonLoader.LoadMongoDBURI(config.MongoDbUriKey, config.EnvironmentLogger)
+	mongoDbUri, err := commonLoader.LoadMongoDBURI(config.MongoDbUriKey)
+	if err != nil {
+		panic(err)
+	}
+	config.EnvironmentLogger.EnvironmentVariableLoaded(config.MongoDbUriKey)
+
+	// Get the MongoDB configuration
+	mongoDbConfig := &commonMongoDb.Config{Uri: mongoDbUri, Timeout: config.MongoDbConnectionTimeout}
 
 	// Connect to MongoDB
-	mongoDbClient, mongoDbContext, mongoDbCancel, err := commonMongoDb.Connect(mongoDbUri, config.MongoDBLogger, config.MongoDbConnectionTimeout)
+	mongodbConnection, err := commonMongoDb.Connect(mongoDbConfig)
 	if err != nil {
-		config.MongoDBLogger.FailedToConnectToMongoDb(err)
+		panic(err)
 	}
-	defer commonMongoDb.Disconnect(mongoDbClient, mongoDbContext, mongoDbCancel, config.MongoDBLogger)
+	config.MongoDBLogger.ConnectedToMongoDB()
+
+	// Disconnect from MongoDB
+	defer func() {
+		commonMongoDb.Disconnect(mongodbConnection)
+		config.MongoDBLogger.DisconnectedFromMongoDB()
+	}()
 
 	// Listen on the given port
-	listener, err := net.Listen("tcp", listenerPort)
+	listener, err := net.Listen("tcp", servicePort.FormattedPort)
 	if err != nil {
-		config.ListenerLogger.FailedToListen(err)
+		panic(customListenerError.FailedToListenError{Err: err})
 	}
 	defer func() {
 		if err := listener.Close(); err != nil {
-			config.ListenerLogger.FailedToClose(err)
+			panic(customListenerError.FailedToCloseError{Err: err})
 		}
 	}()
 
@@ -47,15 +66,16 @@ func main() {
 	s := grpc.NewServer()
 
 	// Create a new gRPC UsersServiceServer
-	usersServiceServer := grpc_server.NewUsersServiceServer(mongoDbClient)
+	usersServiceServer := grpc_server.NewUsersServiceServer(mongodbConnection)
 
 	// Register the UsersServiceServer with the gRPC server
 	protobuf.RegisterUsersServiceServer(s, usersServiceServer)
-	config.ListenerLogger.ServerStarted(port)
+	config.ListenerLogger.ServerStarted(servicePort.Port)
 
 	// Serve the gRPC server
 	if err := s.Serve(listener); err != nil {
-		config.ListenerLogger.FailedToServe(err)
+		panic(customListenerError.FailedToServeError{Err: err})
 	}
+	config.ListenerLogger.ServerStarted(servicePort.Port)
 	defer s.Stop()
 }

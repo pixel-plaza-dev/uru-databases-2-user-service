@@ -7,3 +7,7 @@
 
 # Executable files
 /**/*.exe
+
+# Private and public keys
+/**/*.ed
+/**/*.pub

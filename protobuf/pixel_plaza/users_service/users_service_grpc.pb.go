@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             v5.28.2
-// source: common/grpc/users_service.proto
+// source: grpc_common/protobuf/users_service.proto
 
 package users_service
 
@@ -167,7 +167,7 @@ func (c *usersServiceClient) DeleteUser(ctx context.Context, in *DeleteUserReque
 	return out, nil
 }
 
-// UsersServiceServer is the grpc_server API for UsersService service.
+// UsersServiceServer is the server API for UsersService service.
 // All implementations must embed UnimplementedUsersServiceServer
 // for forward compatibility.
 type UsersServiceServer interface {
@@ -497,5 +497,5 @@ var UsersService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "common/grpc/users_service.proto",
+	Metadata: "grpc_common/protobuf/users_service.proto",
 }

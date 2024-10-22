@@ -1,28 +1,25 @@
 package grpc_server
 
 import (
-	"go.mongodb.org/mongo-driver/mongo"
+	commonMongoDb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 	"golang.org/x/net/context"
-	"pixel_plaza/users_service/config"
-	"pixel_plaza/users_service/logger"
 	protobuf "pixel_plaza/users_service/protobuf/pixel_plaza/users_service"
 )
 
 type UsersServiceServer struct {
-	mongoDbClient *mongo.Client
-	logger        *logger.UsersServiceLogger
+	mongodbConnection *commonMongoDb.Connection
 	protobuf.UnimplementedUsersServiceServer
 }
 
 // NewUsersServiceServer creates a new users service server
-func NewUsersServiceServer(mongoDbClient *mongo.Client) *UsersServiceServer {
-	usersServiceLogger := logger.NewUsersServiceLogger(config.UsersServiceLoggerName)
-	return &UsersServiceServer{mongoDbClient: mongoDbClient, logger: usersServiceLogger}
+func NewUsersServiceServer(mongoDbConnection *commonMongoDb.Connection) *UsersServiceServer {
+	// Create a new logger and MongoDB service
+	return &UsersServiceServer{mongodbConnection: mongoDbConnection}
 }
 
 // SignUp creates a new user
 func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (*protobuf.SignUpResponse, error) {
-	//TODO implement me
+
 	panic("implement me")
 }
 
