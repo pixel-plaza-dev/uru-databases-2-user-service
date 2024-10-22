@@ -3,7 +3,7 @@
 /.vscode
 
 # Environment variables
-/**/.env
+/**/*.env
 
 # Executable files
 /**/*.exe

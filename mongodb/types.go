@@ -1,11 +1,11 @@
-package model
+package mongodb
 
 import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"time"
 )
 
-// User is the model for the user entity
+// User is the mongodb for the user entity
 type User struct {
 	ID        primitive.ObjectID `json:"id" bson:"_id"`
 	Username  string             `json:"username" bson:"username"`
@@ -18,7 +18,7 @@ type User struct {
 	Deleted   bool               `json:"deleted" bson:"deleted"`
 }
 
-// UserEmail is the model for the user email entity
+// UserEmail is the mongodb for the user email entity
 type UserEmail struct {
 	ID         primitive.ObjectID `json:"id" bson:"_id"`
 	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
@@ -29,7 +29,7 @@ type UserEmail struct {
 	IsActive   bool               `json:"is_active" bson:"is_active"`
 }
 
-// UserPhoneNumber is the model for the user phone number entity
+// UserPhoneNumber is the mongodb for the user phone number entity
 type UserPhoneNumber struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id"`
 	UserID      primitive.ObjectID `json:"user_id" bson:"user_id"`
@@ -40,7 +40,7 @@ type UserPhoneNumber struct {
 	IsActive    bool               `json:"is_active" bson:"is_active"`
 }
 
-// UserEmailVerification is the model for the user email verification entity
+// UserEmailVerification is the mongodb for the user email verification entity
 type UserEmailVerification struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id"`
 	UserEmailID primitive.ObjectID `json:"user_email_id" bson:"user_email_id"`
@@ -51,7 +51,7 @@ type UserEmailVerification struct {
 	RevokedAt   time.Time          `json:"revoked_at" bson:"revoked_at"`
 }
 
-// UserPhoneNumberVerification is the model for the user phone number verification entity
+// UserPhoneNumberVerification is the mongodb for the user phone number verification entity
 type UserPhoneNumberVerification struct {
 	ID                primitive.ObjectID `json:"id" bson:"_id"`
 	UserPhoneNumberID primitive.ObjectID `json:"user_phone_number_id" bson:"user_phone_number_id"`
@@ -62,7 +62,7 @@ type UserPhoneNumberVerification struct {
 	RevokedAt         time.Time          `json:"revoked_at" bson:"revoked_at"`
 }
 
-// UserPasswordReset is the model for the user password reset entity
+// UserPasswordReset is the mongodb for the user password reset entity
 type UserPasswordReset struct {
 	ID         primitive.ObjectID `json:"id" bson:"_id"`
 	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
