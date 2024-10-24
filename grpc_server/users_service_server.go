@@ -1,26 +1,131 @@
 package grpc_server
 
 import (
-	commonMongoDb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	"errors"
+	commonBcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
+	commonBcryptError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/crypto/bcrypt"
+	commonValidatorErrorResponse "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error_response/validator"
+	commonValidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	validatorErrorResponse "pixel_plaza/users_service/custom_error_response/validator"
+	"pixel_plaza/users_service/logger"
+	"pixel_plaza/users_service/mongodb"
 	protobuf "pixel_plaza/users_service/protobuf/pixel_plaza/users_service"
+	"time"
+)
+
+const (
+	// Internal is the message for internal server error
+	Internal = "Internal server error"
+
+	// SignUpFailedMessage is the message for failed sign up
+	SignUpFailedMessage = "Failed to sign up"
+
+	// SignUpSuccessMessage is the message for successful sign up
+	SignUpSuccessMessage = "Successfully signed up"
 )
 
 type UsersServiceServer struct {
-	mongodbConnection *commonMongoDb.Connection
+	userDatabase *mongodb.UserDatabase
+	logger       *logger.UsersServiceLogger
 	protobuf.UnimplementedUsersServiceServer
 }
 
 // NewUsersServiceServer creates a new users service server
-func NewUsersServiceServer(mongoDbConnection *commonMongoDb.Connection) *UsersServiceServer {
-	// Create a new logger and MongoDB service
-	return &UsersServiceServer{mongodbConnection: mongoDbConnection}
+func NewUsersServiceServer(userDatabase *mongodb.UserDatabase, logger *logger.UsersServiceLogger) *UsersServiceServer {
+	return &UsersServiceServer{userDatabase: userDatabase, logger: logger}
 }
 
 // SignUp creates a new user
-func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (*protobuf.SignUpResponse, error) {
+func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (response *protobuf.SignUpResponse, err error) {
+	validations := make(map[string][]error)
+	fieldsToCheckIfEmpty := map[string]string{
+		request.HashedPassword: request.GetHashedPassword(),
+		request.Username:       request.GetUsername(),
+		request.FirstName:      request.GetFirstName(),
+		request.LastName:       request.GetLastName(),
+		request.Email:          request.GetEmail(),
+		request.PhoneNumber:    request.GetPhoneNumber(),
+	}
 
-	panic("implement me")
+	// Check if there are required fields empty
+	err = commonValidator.ValidStringFields(&validations, &fieldsToCheckIfEmpty)
+	if err != nil {
+		// Log the error
+		u.logger.FailedToCreateDocument(err)
+		return nil, err
+	}
+
+	// Check if the username is already taken
+	if username := request.GetUsername(); username != "" {
+		if _, err = u.userDatabase.FindUserByUsername(username); !errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, validatorErrorResponse.UsernameTakenError{Username: username}
+		}
+	}
+
+	// Check if the email is valid
+	if email := request.GetEmail(); email != "" {
+		if _, err = commonValidator.ValidMailAddress(email); err != nil {
+			return nil, commonValidatorErrorResponse.InvalidMailAddressError{MailAddress: email}
+		}
+	}
+
+	// Check if the password is hashed
+	if isHashed := commonBcrypt.IsHashed(request.GetHashedPassword()); !isHashed {
+		return nil, commonBcryptError.PasswordNotHashedError{}
+	}
+
+	// Create a new user
+	userId := primitive.NewObjectID()
+	user := mongodb.User{
+		ID:             userId,
+		Username:       request.GetUsername(),
+		FirstName:      request.GetFirstName(),
+		LastName:       request.GetLastName(),
+		HashedPassword: request.GetHashedPassword(),
+		BirthDate:      request.GetBirthDate().AsTime(),
+		Address:        request.GetAddress(),
+	}
+
+	// Create the user email
+	userEmailId := primitive.NewObjectID()
+	userEmail := mongodb.UserEmail{
+		ID:         userEmailId,
+		UserID:     userId,
+		Email:      request.GetEmail(),
+		AssignedAt: time.Now(),
+		IsActive:   true,
+	}
+
+	// Create the user phone number
+	userPhoneNumberId := primitive.NewObjectID()
+	userPhoneNumber := mongodb.UserPhoneNumber{
+		ID:          userPhoneNumberId,
+		UserID:      userId,
+		PhoneNumber: request.GetPhoneNumber(),
+		AssignedAt:  time.Now(),
+		IsActive:    true,
+	}
+
+	// Insert the user into the database
+	if _, err := u.userDatabase.CreateUser(&user, &userEmail, &userPhoneNumber); err != nil {
+		// Log the error
+		u.logger.FailedToCreateDocument(err)
+
+		return nil, status.Error(codes.Internal, Internal)
+	}
+
+	// Log the success
+	u.logger.UserCreated(userId.Hex())
+
+	return &protobuf.SignUpResponse{
+		Code:    uint32(codes.OK),
+		Message: SignUpSuccessMessage,
+	}, nil
 }
 
 // UpdateProfile updates the user's profile

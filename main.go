@@ -10,6 +10,7 @@ import (
 	"net"
 	"pixel_plaza/users_service/config"
 	"pixel_plaza/users_service/grpc_server"
+	"pixel_plaza/users_service/mongodb"
 	protobuf "pixel_plaza/users_service/protobuf/pixel_plaza/users_service"
 )
 
@@ -35,21 +36,31 @@ func main() {
 	}
 	config.EnvironmentLogger.EnvironmentVariableLoaded(config.MongoDbUriKey)
 
+	// Get the required MongoDB database name
+	mongoDbName, err := commonLoader.LoadMongoDBName(config.MongoDbNameKey)
+	if err != nil {
+
+		panic(err)
+	}
+	config.EnvironmentLogger.EnvironmentVariableLoaded(config.MongoDbNameKey)
+
 	// Get the MongoDB configuration
-	mongoDbConfig := &commonMongoDb.Config{Uri: mongoDbUri, Timeout: config.MongoDbConnectionTimeout}
+	mongoDbConfig := &commonMongoDb.Config{Uri: mongoDbUri, Timeout: config.MongoDbConnectionCtxTimeout}
 
 	// Connect to MongoDB
 	mongodbConnection, err := commonMongoDb.Connect(mongoDbConfig)
 	if err != nil {
 		panic(err)
 	}
-	config.MongoDBLogger.ConnectedToMongoDB()
-
-	// Disconnect from MongoDB
 	defer func() {
+		// Disconnect from MongoDB
 		commonMongoDb.Disconnect(mongodbConnection)
-		config.MongoDBLogger.DisconnectedFromMongoDB()
+		config.MongoDbLogger.DisconnectedFromMongoDB()
 	}()
+	config.MongoDbLogger.ConnectedToMongoDB()
+
+	// Create users service database handler
+	usersServiceDatabase := mongodb.NewUserDatabase(mongodbConnection, mongoDbName)
 
 	// Listen on the given port
 	listener, err := net.Listen("tcp", servicePort.FormattedPort)
@@ -66,7 +77,7 @@ func main() {
 	s := grpc.NewServer()
 
 	// Create a new gRPC UsersServiceServer
-	usersServiceServer := grpc_server.NewUsersServiceServer(mongodbConnection)
+	usersServiceServer := grpc_server.NewUsersServiceServer(usersServiceDatabase, config.UsersServiceLogger)
 
 	// Register the UsersServiceServer with the gRPC server
 	protobuf.RegisterUsersServiceServer(s, usersServiceServer)

@@ -5,6 +5,20 @@ import (
 	"pixel_plaza/users_service/logger"
 )
 
+const (
+	// ListenerLoggerName is the name of the listener logger
+	ListenerLoggerName = "Net Listener"
+
+	// EnvironmentLoggerName is the name of the environment logger
+	EnvironmentLoggerName = "Environment"
+
+	// MongoDbLoggerName is the name of the MongoDB logger
+	MongoDbLoggerName = "MongoDB"
+
+	// UsersServiceLoggerName is the name of the UsersService logger
+	UsersServiceLoggerName = "UsersService"
+)
+
 var (
 	// ListenerLogger is the logger for the listener
 	ListenerLogger = commonLogger.NewListenerLogger(ListenerLoggerName)
@@ -12,8 +26,8 @@ var (
 	// EnvironmentLogger is the logger for the environment
 	EnvironmentLogger = commonLogger.NewEnvironmentLogger(EnvironmentLoggerName)
 
-	// MongoDBLogger is the logger for the MongoDB client
-	MongoDBLogger = commonLogger.NewMongoDbLogger(MongoDbLoggerName)
+	// MongoDbLogger is the logger for the MongoDB client
+	MongoDbLogger = commonLogger.NewMongoDbLogger(MongoDbLoggerName)
 
 	// UsersServiceLogger is the logger for the Users Service server
 	UsersServiceLogger = logger.NewUsersServiceLogger(UsersServiceLoggerName)
