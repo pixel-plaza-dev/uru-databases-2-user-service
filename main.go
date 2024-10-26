@@ -45,7 +45,7 @@ func main() {
 	config.EnvironmentLogger.EnvironmentVariableLoaded(config.MongoDbNameKey)
 
 	// Get the MongoDB configuration
-	mongoDbConfig := &commonMongoDb.Config{Uri: mongoDbUri, Timeout: config.MongoDbConnectionCtxTimeout}
+	mongoDbConfig := &commonMongoDb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
 	// Connect to MongoDB
 	mongodbConnection, err := commonMongoDb.Connect(mongoDbConfig)
@@ -60,7 +60,10 @@ func main() {
 	config.MongoDbLogger.ConnectedToMongoDB()
 
 	// Create users service database handler
-	usersServiceDatabase := mongodb.NewUserDatabase(mongodbConnection, mongoDbName)
+	usersServiceDatabase, err := mongodb.NewUserDatabase(mongodbConnection, mongoDbName)
+	if err != nil {
+		panic(err)
+	}
 
 	// Listen on the given port
 	listener, err := net.Listen("tcp", servicePort.FormattedPort)

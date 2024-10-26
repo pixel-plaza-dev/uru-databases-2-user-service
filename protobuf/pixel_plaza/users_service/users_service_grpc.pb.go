@@ -19,17 +19,19 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	UsersService_SignUp_FullMethodName            = "/pixel_plaza.users_service.UsersService/SignUp"
-	UsersService_UpdateProfile_FullMethodName     = "/pixel_plaza.users_service.UsersService/UpdateProfile"
-	UsersService_ChangeUsername_FullMethodName    = "/pixel_plaza.users_service.UsersService/ChangeUsername"
-	UsersService_ChangePassword_FullMethodName    = "/pixel_plaza.users_service.UsersService/ChangePassword"
-	UsersService_ChangeEmail_FullMethodName       = "/pixel_plaza.users_service.UsersService/ChangeEmail"
-	UsersService_VerifyEmail_FullMethodName       = "/pixel_plaza.users_service.UsersService/VerifyEmail"
-	UsersService_ChangePhoneNumber_FullMethodName = "/pixel_plaza.users_service.UsersService/ChangePhoneNumber"
-	UsersService_VerifyPhoneNumber_FullMethodName = "/pixel_plaza.users_service.UsersService/VerifyPhoneNumber"
-	UsersService_ForgotPassword_FullMethodName    = "/pixel_plaza.users_service.UsersService/ForgotPassword"
-	UsersService_ResetPassword_FullMethodName     = "/pixel_plaza.users_service.UsersService/ResetPassword"
-	UsersService_DeleteUser_FullMethodName        = "/pixel_plaza.users_service.UsersService/DeleteUser"
+	UsersService_SignUp_FullMethodName                = "/pixel_plaza.users_service.UsersService/SignUp"
+	UsersService_UpdateProfile_FullMethodName         = "/pixel_plaza.users_service.UsersService/UpdateProfile"
+	UsersService_ChangeUsername_FullMethodName        = "/pixel_plaza.users_service.UsersService/ChangeUsername"
+	UsersService_ChangePassword_FullMethodName        = "/pixel_plaza.users_service.UsersService/ChangePassword"
+	UsersService_ChangeEmail_FullMethodName           = "/pixel_plaza.users_service.UsersService/ChangeEmail"
+	UsersService_VerifyEmail_FullMethodName           = "/pixel_plaza.users_service.UsersService/VerifyEmail"
+	UsersService_GetActiveEmails_FullMethodName       = "/pixel_plaza.users_service.UsersService/GetActiveEmails"
+	UsersService_ChangePhoneNumber_FullMethodName     = "/pixel_plaza.users_service.UsersService/ChangePhoneNumber"
+	UsersService_VerifyPhoneNumber_FullMethodName     = "/pixel_plaza.users_service.UsersService/VerifyPhoneNumber"
+	UsersService_GetActivePhoneNumbers_FullMethodName = "/pixel_plaza.users_service.UsersService/GetActivePhoneNumbers"
+	UsersService_ForgotPassword_FullMethodName        = "/pixel_plaza.users_service.UsersService/ForgotPassword"
+	UsersService_ResetPassword_FullMethodName         = "/pixel_plaza.users_service.UsersService/ResetPassword"
+	UsersService_DeleteUser_FullMethodName            = "/pixel_plaza.users_service.UsersService/DeleteUser"
 )
 
 // UsersServiceClient is the client API for UsersService service.
@@ -42,8 +44,10 @@ type UsersServiceClient interface {
 	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*ChangePasswordResponse, error)
 	ChangeEmail(ctx context.Context, in *ChangeEmailRequest, opts ...grpc.CallOption) (*ChangeEmailResponse, error)
 	VerifyEmail(ctx context.Context, in *VerifyEmailRequest, opts ...grpc.CallOption) (*VerifyEmailResponse, error)
+	GetActiveEmails(ctx context.Context, in *GetActiveEmailsRequest, opts ...grpc.CallOption) (*GetActiveEmailsResponse, error)
 	ChangePhoneNumber(ctx context.Context, in *ChangePhoneNumberRequest, opts ...grpc.CallOption) (*ChangePhoneNumberResponse, error)
 	VerifyPhoneNumber(ctx context.Context, in *VerifyPhoneNumberRequest, opts ...grpc.CallOption) (*VerifyPhoneNumberResponse, error)
+	GetActivePhoneNumbers(ctx context.Context, in *GetActivePhoneNumbersRequest, opts ...grpc.CallOption) (*GetActivePhoneNumbersResponse, error)
 	ForgotPassword(ctx context.Context, in *ForgotPasswordRequest, opts ...grpc.CallOption) (*ForgotPasswordResponse, error)
 	ResetPassword(ctx context.Context, in *ResetPasswordRequest, opts ...grpc.CallOption) (*ResetPasswordResponse, error)
 	DeleteUser(ctx context.Context, in *DeleteUserRequest, opts ...grpc.CallOption) (*DeleteUserResponse, error)
@@ -117,6 +121,16 @@ func (c *usersServiceClient) VerifyEmail(ctx context.Context, in *VerifyEmailReq
 	return out, nil
 }
 
+func (c *usersServiceClient) GetActiveEmails(ctx context.Context, in *GetActiveEmailsRequest, opts ...grpc.CallOption) (*GetActiveEmailsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActiveEmailsResponse)
+	err := c.cc.Invoke(ctx, UsersService_GetActiveEmails_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *usersServiceClient) ChangePhoneNumber(ctx context.Context, in *ChangePhoneNumberRequest, opts ...grpc.CallOption) (*ChangePhoneNumberResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChangePhoneNumberResponse)
@@ -131,6 +145,16 @@ func (c *usersServiceClient) VerifyPhoneNumber(ctx context.Context, in *VerifyPh
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VerifyPhoneNumberResponse)
 	err := c.cc.Invoke(ctx, UsersService_VerifyPhoneNumber_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *usersServiceClient) GetActivePhoneNumbers(ctx context.Context, in *GetActivePhoneNumbersRequest, opts ...grpc.CallOption) (*GetActivePhoneNumbersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetActivePhoneNumbersResponse)
+	err := c.cc.Invoke(ctx, UsersService_GetActivePhoneNumbers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -177,8 +201,10 @@ type UsersServiceServer interface {
 	ChangePassword(context.Context, *ChangePasswordRequest) (*ChangePasswordResponse, error)
 	ChangeEmail(context.Context, *ChangeEmailRequest) (*ChangeEmailResponse, error)
 	VerifyEmail(context.Context, *VerifyEmailRequest) (*VerifyEmailResponse, error)
+	GetActiveEmails(context.Context, *GetActiveEmailsRequest) (*GetActiveEmailsResponse, error)
 	ChangePhoneNumber(context.Context, *ChangePhoneNumberRequest) (*ChangePhoneNumberResponse, error)
 	VerifyPhoneNumber(context.Context, *VerifyPhoneNumberRequest) (*VerifyPhoneNumberResponse, error)
+	GetActivePhoneNumbers(context.Context, *GetActivePhoneNumbersRequest) (*GetActivePhoneNumbersResponse, error)
 	ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error)
 	ResetPassword(context.Context, *ResetPasswordRequest) (*ResetPasswordResponse, error)
 	DeleteUser(context.Context, *DeleteUserRequest) (*DeleteUserResponse, error)
@@ -210,11 +236,17 @@ func (UnimplementedUsersServiceServer) ChangeEmail(context.Context, *ChangeEmail
 func (UnimplementedUsersServiceServer) VerifyEmail(context.Context, *VerifyEmailRequest) (*VerifyEmailResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyEmail not implemented")
 }
+func (UnimplementedUsersServiceServer) GetActiveEmails(context.Context, *GetActiveEmailsRequest) (*GetActiveEmailsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetActiveEmails not implemented")
+}
 func (UnimplementedUsersServiceServer) ChangePhoneNumber(context.Context, *ChangePhoneNumberRequest) (*ChangePhoneNumberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ChangePhoneNumber not implemented")
 }
 func (UnimplementedUsersServiceServer) VerifyPhoneNumber(context.Context, *VerifyPhoneNumberRequest) (*VerifyPhoneNumberResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyPhoneNumber not implemented")
+}
+func (UnimplementedUsersServiceServer) GetActivePhoneNumbers(context.Context, *GetActivePhoneNumbersRequest) (*GetActivePhoneNumbersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetActivePhoneNumbers not implemented")
 }
 func (UnimplementedUsersServiceServer) ForgotPassword(context.Context, *ForgotPasswordRequest) (*ForgotPasswordResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ForgotPassword not implemented")
@@ -354,6 +386,24 @@ func _UsersService_VerifyEmail_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UsersService_GetActiveEmails_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActiveEmailsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsersServiceServer).GetActiveEmails(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UsersService_GetActiveEmails_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsersServiceServer).GetActiveEmails(ctx, req.(*GetActiveEmailsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _UsersService_ChangePhoneNumber_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ChangePhoneNumberRequest)
 	if err := dec(in); err != nil {
@@ -386,6 +436,24 @@ func _UsersService_VerifyPhoneNumber_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UsersServiceServer).VerifyPhoneNumber(ctx, req.(*VerifyPhoneNumberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UsersService_GetActivePhoneNumbers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetActivePhoneNumbersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsersServiceServer).GetActivePhoneNumbers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UsersService_GetActivePhoneNumbers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsersServiceServer).GetActivePhoneNumbers(ctx, req.(*GetActivePhoneNumbersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -476,12 +544,20 @@ var UsersService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _UsersService_VerifyEmail_Handler,
 		},
 		{
+			MethodName: "GetActiveEmails",
+			Handler:    _UsersService_GetActiveEmails_Handler,
+		},
+		{
 			MethodName: "ChangePhoneNumber",
 			Handler:    _UsersService_ChangePhoneNumber_Handler,
 		},
 		{
 			MethodName: "VerifyPhoneNumber",
 			Handler:    _UsersService_VerifyPhoneNumber_Handler,
+		},
+		{
+			MethodName: "GetActivePhoneNumbers",
+			Handler:    _UsersService_GetActivePhoneNumbers_Handler,
 		},
 		{
 			MethodName: "ForgotPassword",

@@ -1,0 +1,46 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "first_name",
+      "last_name",
+      "username",
+      "hashed_password",
+      "deleted"
+    ],
+    "properties": {
+      "first_name": {
+        "bsonType": "string",
+        "description": "must be a string and is required",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "last_name": {
+        "bsonType": "string",
+        "description": "must be a string and is required",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "username": {
+        "bsonType": "string",
+        "description": "must be a string and is required",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "hashed_password": {
+        "bsonType": "string",
+        "description": "must be a string and is required",
+        "minLength": 60,
+        "maxLength": 60
+      },
+      "birth_date": {
+        "bsonType": "date",
+        "description": "must be a date"
+      },
+      "deleted": {
+        "bsonType": "bool",
+        "description": "must be a boolean"
+      }
+    }
+  }
+}

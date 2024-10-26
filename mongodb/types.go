@@ -22,9 +22,9 @@ type UserEmail struct {
 	ID         primitive.ObjectID `json:"id" bson:"_id"`
 	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
 	Email      string             `json:"email" bson:"email"`
-	AssignedAt time.Time          `json:"assigned" bson:"assigned"`
-	VerifiedAt time.Time          `json:"verified,omitempty" bson:"verified,omitempty"`
-	RevokedAt  time.Time          `json:"revoked,omitempty" bson:"revoked,omitempty"`
+	AssignedAt time.Time          `json:"assigned_at" bson:"assigned_at"`
+	VerifiedAt time.Time          `json:"verified_at,omitempty" bson:"verified_at,omitempty"`
+	RevokedAt  time.Time          `json:"revoked_at,omitempty" bson:"revoked_at,omitempty"`
 	IsActive   bool               `json:"is_active" bson:"is_active"`
 }
 
@@ -33,9 +33,9 @@ type UserPhoneNumber struct {
 	ID          primitive.ObjectID `json:"id" bson:"_id"`
 	UserID      primitive.ObjectID `json:"user_id" bson:"user_id"`
 	PhoneNumber string             `json:"phone_number" bson:"phone_number"`
-	AssignedAt  time.Time          `json:"assigned" bson:"assigned"`
-	VerifiedAt  time.Time          `json:"verified,omitempty" bson:"verified,omitempty"`
-	RevokedAt   time.Time          `json:"revoked,omitempty" bson:"revoked,omitempty"`
+	AssignedAt  time.Time          `json:"assigned_at" bson:"assigned_at"`
+	VerifiedAt  time.Time          `json:"verified_at,omitempty" bson:"verified_at,omitempty"`
+	RevokedAt   time.Time          `json:"revoked_at,omitempty" bson:"revoked_at,omitempty"`
 	IsActive    bool               `json:"is_active" bson:"is_active"`
 }
 
@@ -46,8 +46,8 @@ type UserEmailVerification struct {
 	UUID        string             `json:"uuid" bson:"uuid"`
 	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
 	ExpiresAt   time.Time          `json:"expires_at" bson:"expires_at"`
-	VerifiedAt  time.Time          `json:"verified_at" bson:"verified_at"`
-	RevokedAt   time.Time          `json:"revoked_at" bson:"revoked_at"`
+	VerifiedAt  time.Time          `json:"verified_at,omitempty" bson:"verified_at,omitempty"`
+	RevokedAt   time.Time          `json:"revoked_at,omitempty" bson:"revoked_at,omitempty"`
 }
 
 // UserPhoneNumberVerification is the MongoDB for the user phone number verification entity
@@ -57,17 +57,33 @@ type UserPhoneNumberVerification struct {
 	VerificationCode  string             `json:"verification_code" bson:"verification_code"`
 	CreatedAt         time.Time          `json:"created_at" bson:"created_at"`
 	ExpiresAt         time.Time          `json:"expires_at" bson:"expires_at"`
-	VerifiedAt        time.Time          `json:"verified_at" bson:"verified_at"`
-	RevokedAt         time.Time          `json:"revoked_at" bson:"revoked_at"`
+	VerifiedAt        time.Time          `json:"verified_at,omitempty" bson:"verified_at,omitempty"`
+	RevokedAt         time.Time          `json:"revoked_at,omitempty" bson:"revoked_at,omitempty"`
 }
 
 // UserResetPassword is the MongoDB for the user password reset entity
-type UserResetPasswor struct {
+type UserResetPassword struct {
 	ID         primitive.ObjectID `json:"id" bson:"_id"`
 	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
 	UUID       string             `json:"uuid" bson:"uuid"`
 	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
 	ExpiresAt  time.Time          `json:"expires_at" bson:"expires_at"`
-	VerifiedAt time.Time          `json:"verified_at" bson:"verified_at"`
-	RevokedAt  time.Time          `json:"revoked_at" bson:"revoked_at"`
+	VerifiedAt time.Time          `json:"verified_at,omitempty" bson:"verified_at,omitempty"`
+	RevokedAt  time.Time          `json:"revoked_at,omitempty" bson:"revoked_at,omitempty"`
+}
+
+// UserUsernameLog is the MongoDB for the user username log entity
+type UserUsernameLog struct {
+	ID         primitive.ObjectID `json:"id" bson:"_id"`
+	UserID     primitive.ObjectID `json:"user_id" bson:"user_id"`
+	Username   string             `json:"username" bson:"username"`
+	AssignedAt time.Time          `json:"assigned_at" bson:"assigned_at"`
+}
+
+// UserHashedPasswordLog is the MongoDB for the user hashed password log entity
+type UserHashedPasswordLog struct {
+	ID             primitive.ObjectID `json:"id" bson:"_id"`
+	UserID         primitive.ObjectID `json:"user_id" bson:"user_id"`
+	HashedPassword string             `json:"hashed_password" bson:"hashed_password"`
+	AssignedAt     time.Time          `json:"assigned_at" bson:"assigned_at"`
 }

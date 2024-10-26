@@ -1,0 +1,38 @@
+{
+  "$jsonSchema":{
+    "required": [
+      "phone_number",
+      "user_id",
+      "assigned_at",
+      "is_active"
+    ],
+    "properties": {
+        "phone_number": {
+            "bsonType": "string",
+            "description": "must be a string and is required",
+            "minLength": 1,
+            "maxLength": 64
+        },
+      "user_id": {
+        "bsonType": "objectId",
+        "description": "must be an objectId and is required"
+      },
+      "assigned_at": {
+        "bsonType": "date",
+        "description": "must be a date and is required"
+      },
+      "is_active": {
+        "bsonType": "bool",
+        "description": "must be a boolean and is required"
+      },
+      "revoked_at": {
+        "bsonType": "date",
+        "description": "must be a date"
+      },
+      "verified_at": {
+        "bsonType": "date",
+        "description": "must be a date"
+      }
+    }
+  }
+}

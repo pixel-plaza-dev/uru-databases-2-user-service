@@ -1,13 +1,11 @@
 package grpc_server
 
 import (
-	"errors"
 	commonBcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonBcryptError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/crypto/bcrypt"
 	commonValidatorErrorResponse "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error_response/validator"
 	commonValidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -42,53 +40,76 @@ func NewUsersServiceServer(userDatabase *mongodb.UserDatabase, logger *logger.Us
 
 // SignUp creates a new user
 func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (response *protobuf.SignUpResponse, err error) {
+	// Validation variables
 	validations := make(map[string][]error)
-	fieldsToCheckIfEmpty := map[string]string{
-		request.HashedPassword: request.GetHashedPassword(),
-		request.Username:       request.GetUsername(),
-		request.FirstName:      request.GetFirstName(),
-		request.LastName:       request.GetLastName(),
-		request.Email:          request.GetEmail(),
-		request.PhoneNumber:    request.GetPhoneNumber(),
+	userExists := false
+
+	// Get the request fields
+	fieldsToValidate := map[string]string{
+		"Username":       "username",
+		"FirstName":      "first_name",
+		"LastName":       "last_name",
+		"HashedPassword": "hashed_password",
+		"Email":          "email",
+		"PhoneNumber":    "phone_number",
 	}
 
-	// Check if there are required fields empty
-	err = commonValidator.ValidStringFields(&validations, &fieldsToCheckIfEmpty)
-	if err != nil {
-		// Log the error
-		u.logger.FailedToCreateDocument(err)
-		return nil, err
-	}
+	// Check if the required string fields are empty
+	commonValidator.ValidNonEmptyStringFields(&validations, request, &fieldsToValidate)
 
-	// Check if the username is already taken
-	if username := request.GetUsername(); username != "" {
-		if _, err = u.userDatabase.FindUserByUsername(username); !errors.Is(err, mongo.ErrNoDocuments) {
-			return nil, validatorErrorResponse.UsernameTakenError{Username: username}
+	// Check if the user already exists
+	username := request.GetUsername()
+	if len(username) > 0 {
+		if _, err := u.userDatabase.FindUserByUsername(username); err == nil {
+			userExists = true
+			validations["username"] = append(validations["username"], validatorErrorResponse.UsernameTakenError{})
 		}
 	}
 
 	// Check if the email is valid
-	if email := request.GetEmail(); email != "" {
+	email := request.GetEmail()
+	if len(email) > 0 {
 		if _, err = commonValidator.ValidMailAddress(email); err != nil {
-			return nil, commonValidatorErrorResponse.InvalidMailAddressError{MailAddress: email}
+			field := "email"
+			validations[field] = append(validations[field], commonValidatorErrorResponse.InvalidMailAddressError{})
 		}
 	}
 
 	// Check if the password is hashed
-	if isHashed := commonBcrypt.IsHashed(request.GetHashedPassword()); !isHashed {
-		return nil, commonBcryptError.PasswordNotHashedError{}
+	hashedPassword := request.GetHashedPassword()
+	if isHashed := commonBcrypt.IsHashed(hashedPassword); !isHashed {
+		field := "hashed_password"
+		validations[field] = append(validations[field], commonBcryptError.PasswordNotHashedError{})
+	}
+
+	// Check if the birthdate is valid
+	birthDateTimestamp := request.GetBirthDate()
+	birthDate := birthDateTimestamp.AsTime()
+	currentTime := time.Now()
+	if birthDateTimestamp == nil || birthDate.After(currentTime) {
+		field := "birth_date"
+		validations[field] = append(validations[field], validatorErrorResponse.InvalidBirthDateError{BirthDate: birthDate})
+	}
+
+	// Check if there are any validation errors
+	if len(validations) > 0 {
+		err = commonValidatorErrorResponse.FailedValidationError{FieldsErrors: &validations}
+
+		if userExists {
+			return nil, status.Error(codes.AlreadyExists, err.Error())
+		}
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	// Create a new user
 	userId := primitive.NewObjectID()
 	user := mongodb.User{
 		ID:             userId,
-		Username:       request.GetUsername(),
+		Username:       username,
 		FirstName:      request.GetFirstName(),
 		LastName:       request.GetLastName(),
-		HashedPassword: request.GetHashedPassword(),
-		BirthDate:      request.GetBirthDate().AsTime(),
-		Address:        request.GetAddress(),
+		HashedPassword: hashedPassword,
+		BirthDate:      birthDate,
 	}
 
 	// Create the user email
@@ -96,8 +117,8 @@ func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUp
 	userEmail := mongodb.UserEmail{
 		ID:         userEmailId,
 		UserID:     userId,
-		Email:      request.GetEmail(),
-		AssignedAt: time.Now(),
+		Email:      email,
+		AssignedAt: currentTime,
 		IsActive:   true,
 	}
 
@@ -107,16 +128,16 @@ func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUp
 		ID:          userPhoneNumberId,
 		UserID:      userId,
 		PhoneNumber: request.GetPhoneNumber(),
-		AssignedAt:  time.Now(),
+		AssignedAt:  currentTime,
 		IsActive:    true,
 	}
 
 	// Insert the user into the database
-	if _, err := u.userDatabase.CreateUser(&user, &userEmail, &userPhoneNumber); err != nil {
+	if _, err = u.userDatabase.CreateUser(&user, &userEmail, &userPhoneNumber); err != nil {
 		// Log the error
 		u.logger.FailedToCreateDocument(err)
 
-		return nil, status.Error(codes.Internal, Internal)
+		return nil, status.Error(codes.Internal, SignUpFailedMessage)
 	}
 
 	// Log the success
