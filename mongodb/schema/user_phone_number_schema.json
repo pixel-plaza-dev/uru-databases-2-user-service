@@ -1,5 +1,5 @@
 {
-  "$jsonSchema":{
+  "$jsonSchema": {
     "required": [
       "phone_number",
       "user_id",
@@ -7,12 +7,12 @@
       "is_active"
     ],
     "properties": {
-        "phone_number": {
-            "bsonType": "string",
-            "description": "must be a string and is required",
-            "minLength": 1,
-            "maxLength": 64
-        },
+      "phone_number": {
+        "bsonType": "string",
+        "description": "must be a string and is required",
+        "minLength": 1,
+        "maxLength": 64
+      },
       "user_id": {
         "bsonType": "objectId",
         "description": "must be an objectId and is required"

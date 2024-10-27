@@ -4,15 +4,16 @@ import (
 	commonBcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonBcryptError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/crypto/bcrypt"
 	commonValidatorErrorResponse "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error_response/validator"
+	commonUsersService "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/users_service"
 	commonValidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
+	validatorErrorResponse "github.com/pixel-plaza-dev/uru-databases-2-users-service/custom_error_response/validator"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/logger"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/mongodb"
+	protobuf "github.com/pixel-plaza-dev/uru-databases-2-users-service/protobuf/pixel_plaza/users_service"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	validatorErrorResponse "pixel_plaza/users_service/custom_error_response/validator"
-	"pixel_plaza/users_service/logger"
-	"pixel_plaza/users_service/mongodb"
-	protobuf "pixel_plaza/users_service/protobuf/pixel_plaza/users_service"
 	"time"
 )
 
@@ -103,7 +104,7 @@ func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUp
 
 	// Create a new user
 	userId := primitive.NewObjectID()
-	user := mongodb.User{
+	user := commonUsersService.User{
 		ID:             userId,
 		Username:       username,
 		FirstName:      request.GetFirstName(),
@@ -114,7 +115,7 @@ func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUp
 
 	// Create the user email
 	userEmailId := primitive.NewObjectID()
-	userEmail := mongodb.UserEmail{
+	userEmail := commonUsersService.UserEmail{
 		ID:         userEmailId,
 		UserID:     userId,
 		Email:      email,
@@ -124,7 +125,7 @@ func (u UsersServiceServer) SignUp(ctx context.Context, request *protobuf.SignUp
 
 	// Create the user phone number
 	userPhoneNumberId := primitive.NewObjectID()
-	userPhoneNumber := mongodb.UserPhoneNumber{
+	userPhoneNumber := commonUsersService.UserPhoneNumber{
 		ID:          userPhoneNumberId,
 		UserID:      userId,
 		PhoneNumber: request.GetPhoneNumber(),
@@ -179,6 +180,12 @@ func (u UsersServiceServer) VerifyEmail(ctx context.Context, request *protobuf.V
 	panic("implement me")
 }
 
+// GetActiveEmails gets the user's active emails
+func (u UsersServiceServer) GetActiveEmails(ctx context.Context, request *protobuf.GetActiveEmailsRequest) (*protobuf.GetActiveEmailsResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 // ChangePhoneNumber changes the user's phone number
 func (u UsersServiceServer) ChangePhoneNumber(ctx context.Context, request *protobuf.ChangePhoneNumberRequest) (*protobuf.ChangePhoneNumberResponse, error) {
 	//TODO implement me
@@ -187,6 +194,12 @@ func (u UsersServiceServer) ChangePhoneNumber(ctx context.Context, request *prot
 
 // VerifyPhoneNumber verifies the user's phone number
 func (u UsersServiceServer) VerifyPhoneNumber(ctx context.Context, request *protobuf.VerifyPhoneNumberRequest) (*protobuf.VerifyPhoneNumberResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+// GetActivePhoneNumber gets the user's active phone number
+func (u UsersServiceServer) GetActivePhoneNumbers(ctx context.Context, request *protobuf.GetActivePhoneNumbersRequest) (*protobuf.GetActivePhoneNumbersResponse, error) {
 	//TODO implement me
 	panic("implement me")
 }

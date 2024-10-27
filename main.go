@@ -6,12 +6,12 @@ import (
 	customListenerError "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/custom_error/listener"
 	commonLoader "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/loader"
 	commonMongoDb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/config"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/grpc_server"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/mongodb"
+	protobuf "github.com/pixel-plaza-dev/uru-databases-2-users-service/protobuf/pixel_plaza/users_service"
 	"google.golang.org/grpc"
 	"net"
-	"pixel_plaza/users_service/config"
-	"pixel_plaza/users_service/grpc_server"
-	"pixel_plaza/users_service/mongodb"
-	protobuf "pixel_plaza/users_service/protobuf/pixel_plaza/users_service"
 )
 
 // Load environment variables

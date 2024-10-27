@@ -2,7 +2,7 @@ package config
 
 import (
 	commonLogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/logger"
-	"pixel_plaza/users_service/logger"
+	"github.com/pixel-plaza-dev/uru-databases-2-users-service/logger"
 )
 
 const (

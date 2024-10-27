@@ -1,5 +1,5 @@
 {
-  "$jsonSchema":{
+  "$jsonSchema": {
     "required": [
       "email",
       "user_id",

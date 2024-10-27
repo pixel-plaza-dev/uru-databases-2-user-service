@@ -1,10 +1,10 @@
-module pixel_plaza/users_service
+module github.com/pixel-plaza-dev/uru-databases-2-users-service
 
 go 1.23.0
 
 require (
 	github.com/joho/godotenv v1.5.1
-	github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.1.9
+	github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.2.0
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/net v0.30.0
 	google.golang.org/grpc v1.67.1

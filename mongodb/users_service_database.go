@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	commonMongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	commonUsersService "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/users_service"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -62,7 +63,7 @@ func (u *UserDatabase) GetCollection(collection *commonMongodb.Collection) *mong
 }
 
 // FindUser finds a user
-func (u *UserDatabase) FindUser(filter bson.M) (user *User, err error) {
+func (u *UserDatabase) FindUser(filter bson.M) (user *commonUsersService.User, err error) {
 	// Create the context
 	ctx, cancelFunc := u.GetQueryContext()
 	defer cancelFunc()
@@ -77,7 +78,7 @@ func (u *UserDatabase) FindUser(filter bson.M) (user *User, err error) {
 }
 
 // FindUserByUsername finds a user by username
-func (u *UserDatabase) FindUserByUsername(username string) (user *User, err error) {
+func (u *UserDatabase) FindUserByUsername(username string) (user *commonUsersService.User, err error) {
 	// Create the filter
 	filter := bson.M{"username": username}
 	return u.FindUser(filter)
@@ -99,17 +100,17 @@ func (u *UserDatabase) InsertOne(collection *commonMongodb.Collection, document 
 }
 
 // CreateUserUsernameLog creates a new user username log
-func (u *UserDatabase) CreateUserUsernameLog(userUsernameLog UserUsernameLog) (result *mongo.InsertOneResult, err error) {
+func (u *UserDatabase) CreateUserUsernameLog(userUsernameLog commonUsersService.UserUsernameLog) (result *mongo.InsertOneResult, err error) {
 	return u.InsertOne(UserUsernameLogCollection, userUsernameLog)
 }
 
 // CreateUserHashedPasswordLog creates a new user hashed password log
-func (u *UserDatabase) CreateUserHashedPasswordLog(userHashedPasswordLog *UserHashedPasswordLog) (result *mongo.InsertOneResult, err error) {
+func (u *UserDatabase) CreateUserHashedPasswordLog(userHashedPasswordLog *commonUsersService.UserHashedPasswordLog) (result *mongo.InsertOneResult, err error) {
 	return u.InsertOne(UserHashedPasswordLogCollection, userHashedPasswordLog)
 }
 
 // CreateUser creates a new user
-func (u *UserDatabase) CreateUser(user *User, email *UserEmail, phoneNumber *UserPhoneNumber) (result interface{}, err error) {
+func (u *UserDatabase) CreateUser(user *commonUsersService.User, email *commonUsersService.UserEmail, phoneNumber *commonUsersService.UserPhoneNumber) (result interface{}, err error) {
 	// Create the transaction options
 	wc := writeconcern.Majority()
 	txnOptions := options.Transaction().SetWriteConcern(wc)
@@ -127,7 +128,7 @@ func (u *UserDatabase) CreateUser(user *User, email *UserEmail, phoneNumber *Use
 
 	// Create the UserUsernameLog
 	currentTime := time.Now()
-	userUsernameLog := UserUsernameLog{
+	userUsernameLog := commonUsersService.UserUsernameLog{
 		ID:         primitive.NewObjectID(),
 		UserID:     user.ID,
 		Username:   user.Username,
@@ -135,7 +136,7 @@ func (u *UserDatabase) CreateUser(user *User, email *UserEmail, phoneNumber *Use
 	}
 
 	// Create the UserHashedPasswordLog
-	userHashedPasswordLog := UserHashedPasswordLog{
+	userHashedPasswordLog := commonUsersService.UserHashedPasswordLog{
 		ID:             primitive.NewObjectID(),
 		UserID:         user.ID,
 		HashedPassword: user.HashedPassword,
@@ -182,11 +183,11 @@ func (u *UserDatabase) CreateUser(user *User, email *UserEmail, phoneNumber *Use
 }
 
 // CreateUserEmail creates a new user email
-func (u *UserDatabase) CreateUserEmail(userEmail UserEmail) (result *mongo.InsertOneResult, err error) {
+func (u *UserDatabase) CreateUserEmail(userEmail commonUsersService.UserEmail) (result *mongo.InsertOneResult, err error) {
 	return u.InsertOne(UserEmailCollection, userEmail)
 }
 
 // CreateUserPhoneNumber creates a new user phone number
-func (u *UserDatabase) CreateUserPhoneNumber(userPhoneNumber UserPhoneNumber) (result *mongo.InsertOneResult, err error) {
+func (u *UserDatabase) CreateUserPhoneNumber(userPhoneNumber commonUsersService.UserPhoneNumber) (result *mongo.InsertOneResult, err error) {
 	return u.InsertOne(UserPhoneNumberCollection, userPhoneNumber)
 }

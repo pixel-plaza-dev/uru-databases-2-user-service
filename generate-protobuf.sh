@@ -1,1 +1,1 @@
-protoc --go_out=src/protobuf --go_opt=paths=import --go-grpc_out=src/protobuf --go-grpc_opt=paths=import common/grpc/users_service.proto
+protoc --go_out=protobuf --go_opt=paths=import --go-grpc_out=protobuf --go-grpc_opt=paths=import grpc_common/protobuf/users_service.proto
