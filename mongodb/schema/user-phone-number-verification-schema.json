@@ -1,0 +1,39 @@
+{
+  "$jsonSchema": {
+    "required": [
+      "user_phone_number_id",
+      "uuid",
+      "created_at",
+      "expires_at"
+    ],
+    "properties": {
+      "user_phone_number_id": {
+        "bsonType": "objectId",
+        "description": "must be an objectId and is required"
+      },
+      "uuid": {
+        "bsonType": "string",
+        "description": "must be, a string and is required",
+        "minLength": 1,
+        "maxLength": 64,
+        "pattern": "^[a-f0-9]{32}$"
+      },
+      "created_at": {
+        "bsonType": "date",
+        "description": "must be a date and is required"
+      },
+      "expires_at": {
+        "bsonType": "date",
+        "description": "must be a date and is required"
+      },
+      "revoked_at": {
+        "bsonType": "date",
+        "description": "must be a date"
+      },
+      "verified_at": {
+        "bsonType": "date",
+        "description": "must be a date"
+      }
+    }
+  }
+}

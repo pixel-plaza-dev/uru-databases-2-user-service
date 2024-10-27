@@ -22,7 +22,7 @@ func init() {
 }
 
 func main() {
-	// Get the port and listener port
+	// Get the listener port
 	servicePort, err := commonLoader.LoadServicePort(config.UsersServicePortKey)
 	if err != nil {
 		panic(err)
