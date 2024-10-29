@@ -4,6 +4,14 @@ import (
 	commonMongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 )
 
+const (
+	// MongoDbUriKey is the key of the MongoDB host
+	MongoDbUriKey = "MONGO_DB_HOST"
+
+	// MongoDbNameKey is the key of the MongoDB database name
+	MongoDbNameKey = "MONGO_DB_NAME"
+)
+
 var (
 	// userCollectionSingleFieldIndex is the single field indexes for the user collection
 	userCollectionSingleFieldIndex = []*commonMongodb.SingleFieldIndex{

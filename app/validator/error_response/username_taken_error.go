@@ -1,4 +1,4 @@
-package validator
+package error_response
 
 type UsernameTakenError struct{}
 

@@ -1,4 +1,4 @@
-package validator
+package error_response
 
 type InvalidBirthDateError struct {
 	BirthDate interface{}
