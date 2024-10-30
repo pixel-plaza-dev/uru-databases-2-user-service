@@ -3,10 +3,9 @@ package main
 import (
 	"flag"
 	"github.com/joho/godotenv"
-	commonenverror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/env/error"
+	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/flag"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener"
-	commonlistenererror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener/error"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
@@ -21,7 +20,7 @@ import (
 // Load environment variables
 func init() {
 	if err := godotenv.Load(); err != nil {
-		panic(commonenverror.FailedToLoadEnvironmentVariablesError{Err: err})
+		panic(commonenv.FailedToLoadEnvironmentVariablesError)
 	}
 }
 
@@ -77,11 +76,11 @@ func main() {
 	// Listen on the given port
 	portListener, err := net.Listen("tcp", servicePort.FormattedPort)
 	if err != nil {
-		panic(commonlistenererror.FailedToListenError{Err: err})
+		panic(commonlistener.FailedToListenError)
 	}
 	defer func() {
 		if err := portListener.Close(); err != nil {
-			panic(commonlistenererror.FailedToCloseError{Err: err})
+			panic(commonlistener.FailedToCloseError)
 		}
 	}()
 
@@ -97,7 +96,7 @@ func main() {
 
 	// Serve the gRPC server
 	if err := s.Serve(portListener); err != nil {
-		panic(commonlistenererror.FailedToServeError{Err: err})
+		panic(commonlistener.FailedToServeError)
 	}
 	logger.ListenerLogger.ServerStarted(servicePort.Port)
 	defer s.Stop()

@@ -2,14 +2,14 @@ package user
 
 import (
 	commonmessage "github.com/pixel-plaza-dev/uru-databases-2-api-common/message"
+	commoncrypto "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
-	commoncryptoerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/error"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
 	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
-	commonvalidatorresponse "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator/error/response"
+	commonvalidatorerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator/error"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/validator/error_response"
+	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/validator"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
@@ -52,7 +52,7 @@ func (u Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	if len(username) > 0 {
 		if _, err := u.userDatabase.FindUserByUsername(username); err == nil {
 			userExists = true
-			validations["username"] = append(validations["username"], error_response.UsernameTakenError{})
+			validations["username"] = append(validations["username"], validator.UsernameTakenError)
 		}
 	}
 
@@ -61,7 +61,7 @@ func (u Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	if len(email) > 0 {
 		if _, err = commonvalidator.ValidMailAddress(email); err != nil {
 			field := "email"
-			validations[field] = append(validations[field], commonvalidatorresponse.InvalidMailAddressError{})
+			validations[field] = append(validations[field], commonvalidator.InvalidMailAddressError)
 		}
 	}
 
@@ -69,7 +69,7 @@ func (u Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	hashedPassword := request.GetHashedPassword()
 	if isHashed := commonbcrypt.IsHashed(hashedPassword); !isHashed {
 		field := "hashed_password"
-		validations[field] = append(validations[field], commoncryptoerror.PasswordNotHashedError{})
+		validations[field] = append(validations[field], commoncrypto.PasswordNotHashedError)
 	}
 
 	// Check if the birthdate is valid
@@ -78,12 +78,12 @@ func (u Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	currentTime := time.Now()
 	if birthDateTimestamp == nil || birthDate.After(currentTime) {
 		field := "birth_date"
-		validations[field] = append(validations[field], error_response.InvalidBirthDateError{BirthDate: birthDate})
+		validations[field] = append(validations[field], validator.InvalidBirthDateError)
 	}
 
 	// Check if there are any validation errors
 	if len(validations) > 0 {
-		err = commonvalidatorresponse.FailedValidationError{FieldsErrors: &validations}
+		err = commonvalidatorerror.FailedValidationError{FieldsErrors: &validations}
 
 		if userExists {
 			return nil, status.Error(codes.AlreadyExists, err.Error())
