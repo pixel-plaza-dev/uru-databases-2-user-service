@@ -31,38 +31,38 @@ func main() {
 	logger.FlagLogger.ModeFlagSet(commonflag.Mode)
 
 	// Get the listener port
-	servicePort, err := commonlistener.LoadServicePort(listener.UsersServicePortKey)
+	servicePort, err := commonlistener.LoadServicePort(listener.UserServicePortKey)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.UsersServicePortKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.UserServicePortKey)
 
 	// Get the MongoDB URI
-	mongoDbUri, err := commonmongodb.LoadMongoDBURI(mongodb.MongoDbUriKey)
+	mongoDbUri, err := commonmongodb.LoadMongoDBURI(mongodb.UriKey)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.MongoDbUriKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.UriKey)
 
 	// Get the required MongoDB database name
-	mongoDbName, err := commonmongodb.LoadMongoDBName(mongodb.MongoDbNameKey)
+	mongoDbName, err := commonmongodb.LoadMongoDBName(mongodb.DbNameKey)
 	if err != nil {
 
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.MongoDbNameKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
 
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
 	// Connect to MongoDB
-	mongodbConnection, err := commonmongodb.Connect(mongoDbConfig)
-	if err != nil {
+	mongodbConnection := commonmongodb.NewDefaultConnectionHandler(mongoDbConfig)
+	if _, err = mongodbConnection.Connect(); err != nil {
 		panic(err)
 	}
 	defer func() {
 		// Disconnect from MongoDB
-		commonmongodb.Disconnect(mongodbConnection)
+		mongodbConnection.Disconnect()
 		logger.MongoDbLogger.DisconnectedFromMongoDB()
 	}()
 	logger.MongoDbLogger.ConnectedToMongoDB()
@@ -95,7 +95,7 @@ func main() {
 	logger.ListenerLogger.ServerStarted(servicePort.Port)
 
 	// Serve the gRPC server
-	if err := s.Serve(portListener); err != nil {
+	if err = s.Serve(portListener); err != nil {
 		panic(commonlistener.FailedToServeError)
 	}
 	logger.ListenerLogger.ServerStarted(servicePort.Port)

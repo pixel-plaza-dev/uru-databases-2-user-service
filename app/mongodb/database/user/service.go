@@ -14,33 +14,46 @@ import (
 )
 
 type Database struct {
-	mongodbConnection *commonmongodb.Connection
-	database          *mongo.Database
-	collections       *map[string]*commonmongodb.Collection
+	connection  commonmongodb.ConnectionHandler
+	database    *mongo.Database
+	collections *map[string]*commonmongodb.Collection
 }
 
 // NewDatabase creates a new MongoDB user database handler
-func NewDatabase(connection *commonmongodb.Connection, databaseName string) (database *Database, err error) {
-	// Connect to the MongoDB required database
-	usersServiceDb := connection.Client.Database(databaseName)
+func NewDatabase(connection commonmongodb.ConnectionHandler, databaseName string) (database *Database, err error) {
+	// Connect to MongoDB
+	mongodbConnection, err := connection.Connect()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the user service database
+	userServiceDb := mongodbConnection.Database(databaseName)
 
 	// Create map of collections
 	collections := make(map[string]*commonmongodb.Collection)
+
 	for _, collection := range []*commonmongodb.Collection{
 		mongodb.UserCollection, mongodb.UserEmailCollection, mongodb.UserPhoneNumberCollection,
 		mongodb.UserUsernameLogCollection, mongodb.UserHashedPasswordLogCollection} {
+		// Add the collection to the map
 		collections[collection.Name] = collection
+
+		// Create the collection
+		if _, err = collection.CreateCollection(userServiceDb); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create the user database instance
-	instance := &Database{mongodbConnection: connection, database: usersServiceDb, collections: &collections}
+	instance := &Database{connection: connection, database: userServiceDb, collections: &collections}
 
 	return instance, nil
 }
 
 // Client returns the MongoDB client
-func (u *Database) Client() *mongo.Client {
-	return u.mongodbConnection.Client
+func (u *Database) Client() (client *mongo.Client, err error) {
+	return u.connection.GetClient()
 }
 
 // Database returns the MongoDB users database
@@ -120,8 +133,14 @@ func (u *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail
 	ctx, cancelFunc := u.GetTransactionContext()
 	defer cancelFunc()
 
+	// Get client
+	client, err := u.Client()
+	if err != nil {
+		return nil, err
+	}
+
 	// Starts a session on the client
-	session, err := u.Client().StartSession()
+	session, err := client.StartSession()
 	if err != nil {
 		panic(err)
 	}

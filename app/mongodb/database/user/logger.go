@@ -5,12 +5,12 @@ import (
 )
 
 type Logger struct {
-	logger *commonlogger.Logger
+	logger commonlogger.Logger
 }
 
 // NewLogger is the logger for the user database
-func NewLogger(name string) *Logger {
-	return &Logger{logger: commonlogger.NewLogger(name)}
+func NewLogger(logger commonlogger.Logger) Logger {
+	return Logger{logger: logger}
 }
 
 // FailedToCreateDocument logs a FailedToCreateDocumentError

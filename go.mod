@@ -5,7 +5,7 @@ go 1.23.2
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pixel-plaza-dev/uru-databases-2-api-common v0.0.2
-	github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.3.7
+	github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.4
 	github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.4
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/net v0.30.0
