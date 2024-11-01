@@ -55,9 +55,18 @@ func main() {
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
-	// Connect to MongoDB
+	// Get the connection handler
 	mongodbConnection := commonmongodb.NewDefaultConnectionHandler(mongoDbConfig)
-	if _, err = mongodbConnection.Connect(); err != nil {
+
+	// Connect to MongoDB and get the client
+	mongodbClient, err := mongodbConnection.Connect()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create user database handler
+	userDatabase, err := userdatabase.NewDatabase(mongodbClient, mongoDbName)
+	if err != nil {
 		panic(err)
 	}
 	defer func() {
@@ -66,12 +75,6 @@ func main() {
 		logger.MongoDbLogger.DisconnectedFromMongoDB()
 	}()
 	logger.MongoDbLogger.ConnectedToMongoDB()
-
-	// Create user database handler
-	userDatabase, err := userdatabase.NewDatabase(mongodbConnection, mongoDbName)
-	if err != nil {
-		panic(err)
-	}
 
 	// Listen on the given port
 	portListener, err := net.Listen("tcp", servicePort.FormattedPort)

@@ -129,7 +129,6 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	if _, err = s.userDatabase.CreateUser(&newUser, &newUserEmail, &newUserPhoneNumber); err != nil {
 		// Log the error
 		s.logger.FailedToCreateDocument(err)
-
 		return nil, InternalError
 	}
 

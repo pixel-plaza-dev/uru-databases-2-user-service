@@ -14,21 +14,15 @@ import (
 )
 
 type Database struct {
-	connection  commonmongodb.ConnectionHandler
 	database    *mongo.Database
 	collections *map[string]*commonmongodb.Collection
+	client      *mongo.Client
 }
 
 // NewDatabase creates a new MongoDB user database handler
-func NewDatabase(connection commonmongodb.ConnectionHandler, databaseName string) (database *Database, err error) {
-	// Connect to MongoDB
-	mongodbConnection, err := connection.Connect()
-	if err != nil {
-		return nil, err
-	}
-
+func NewDatabase(client *mongo.Client, databaseName string) (database *Database, err error) {
 	// Get the user service database
-	userServiceDb := mongodbConnection.Database(databaseName)
+	userServiceDb := client.Database(databaseName)
 
 	// Create map of collections
 	collections := make(map[string]*commonmongodb.Collection)
@@ -36,54 +30,47 @@ func NewDatabase(connection commonmongodb.ConnectionHandler, databaseName string
 	for _, collection := range []*commonmongodb.Collection{
 		mongodb.UserCollection, mongodb.UserEmailCollection, mongodb.UserPhoneNumberCollection,
 		mongodb.UserUsernameLogCollection, mongodb.UserHashedPasswordLogCollection} {
-		// Add the collection to the map
-		collections[collection.Name] = collection
-
 		// Create the collection
+		collections[collection.Name] = collection
 		if _, err = collection.CreateCollection(userServiceDb); err != nil {
 			return nil, err
 		}
 	}
 
 	// Create the user database instance
-	instance := &Database{connection: connection, database: userServiceDb, collections: &collections}
+	instance := &Database{client: client, database: userServiceDb, collections: &collections}
 
 	return instance, nil
 }
 
-// Client returns the MongoDB client
-func (u *Database) Client() (client *mongo.Client, err error) {
-	return u.connection.GetClient()
-}
-
 // Database returns the MongoDB users database
-func (u *Database) Database() *mongo.Database {
-	return u.database
+func (d *Database) Database() *mongo.Database {
+	return d.database
 }
 
 // GetQueryContext returns a new query context
-func (u *Database) GetQueryContext() (ctx context.Context, cancelFunc context.CancelFunc) {
+func (d *Database) GetQueryContext() (ctx context.Context, cancelFunc context.CancelFunc) {
 	return context.WithTimeout(context.Background(), mongodb.QueryCtxTimeout)
 }
 
 // GetTransactionContext returns a new transaction context
-func (u *Database) GetTransactionContext() (ctx context.Context, cancelFunc context.CancelFunc) {
+func (d *Database) GetTransactionContext() (ctx context.Context, cancelFunc context.CancelFunc) {
 	return context.WithTimeout(context.Background(), mongodb.TransactionCtxTimeout)
 }
 
 // GetCollection returns a collection
-func (u *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Collection {
-	return u.database.Collection(collection.Name)
+func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Collection {
+	return d.database.Collection(collection.Name)
 }
 
 // FindUser finds a user
-func (u *Database) FindUser(filter bson.M) (user *commonuser.User, err error) {
+func (d *Database) FindUser(filter bson.M) (user *commonuser.User, err error) {
 	// Create the context
-	ctx, cancelFunc := u.GetQueryContext()
+	ctx, cancelFunc := d.GetQueryContext()
 	defer cancelFunc()
 
 	// Find the user
-	err = u.GetCollection(mongodb.UserCollection).FindOne(ctx, filter).Decode(&user)
+	err = d.GetCollection(mongodb.UserCollection).FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
@@ -92,20 +79,20 @@ func (u *Database) FindUser(filter bson.M) (user *commonuser.User, err error) {
 }
 
 // FindUserByUsername finds a user by username
-func (u *Database) FindUserByUsername(username string) (user *commonuser.User, err error) {
+func (d *Database) FindUserByUsername(username string) (user *commonuser.User, err error) {
 	// Create the filter
 	filter := bson.M{"username": username}
-	return u.FindUser(filter)
+	return d.FindUser(filter)
 }
 
 // InsertOne inserts a document into a collection
-func (u *Database) InsertOne(collection *commonmongodb.Collection, document interface{}) (result *mongo.InsertOneResult, err error) {
+func (d *Database) InsertOne(collection *commonmongodb.Collection, document interface{}) (result *mongo.InsertOneResult, err error) {
 	// Create the context
-	ctx, cancelFunc := u.GetQueryContext()
+	ctx, cancelFunc := d.GetQueryContext()
 	defer cancelFunc()
 
 	// Insert the document
-	result, err = u.GetCollection(collection).InsertOne(ctx, document)
+	result, err = d.GetCollection(collection).InsertOne(ctx, document)
 	if err != nil {
 		return nil, err
 	}
@@ -114,48 +101,34 @@ func (u *Database) InsertOne(collection *commonmongodb.Collection, document inte
 }
 
 // CreateUserUsernameLog creates a new user username log
-func (u *Database) CreateUserUsernameLog(userUsernameLog commonuser.UserUsernameLog) (result *mongo.InsertOneResult, err error) {
-	return u.InsertOne(mongodb.UserUsernameLogCollection, userUsernameLog)
+func (d *Database) CreateUserUsernameLog(userUsernameLog commonuser.UserUsernameLog) (result *mongo.InsertOneResult, err error) {
+	return d.InsertOne(mongodb.UserUsernameLogCollection, userUsernameLog)
 }
 
 // CreateUserHashedPasswordLog creates a new user hashed password log
-func (u *Database) CreateUserHashedPasswordLog(userHashedPasswordLog *commonuser.UserHashedPasswordLog) (result *mongo.InsertOneResult, err error) {
-	return u.InsertOne(mongodb.UserHashedPasswordLogCollection, userHashedPasswordLog)
+func (d *Database) CreateUserHashedPasswordLog(userHashedPasswordLog *commonuser.UserHashedPasswordLog) (result *mongo.InsertOneResult, err error) {
+	return d.InsertOne(mongodb.UserHashedPasswordLogCollection, userHashedPasswordLog)
 }
 
 // CreateUser creates a new user
-func (u *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail, phoneNumber *commonuser.UserPhoneNumber) (result interface{}, err error) {
+func (d *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail, phoneNumber *commonuser.UserPhoneNumber) (result interface{}, err error) {
 	// Create the transaction options
 	wc := writeconcern.Majority()
 	txnOptions := options.Transaction().SetWriteConcern(wc)
 
 	// Create the context
-	ctx, cancelFunc := u.GetTransactionContext()
+	ctx, cancelFunc := d.GetTransactionContext()
 	defer cancelFunc()
 
-	// Get client
-	client, err := u.Client()
-	if err != nil {
-		return nil, err
-	}
-
 	// Starts a session on the client
-	session, err := client.StartSession()
+	session, err := d.client.StartSession()
 	if err != nil {
 		panic(err)
 	}
 	defer session.EndSession(ctx)
 
-	// Create the UserUsernameLog
-	currentTime := time.Now()
-	userUsernameLog := commonuser.UserUsernameLog{
-		ID:         primitive.NewObjectID(),
-		UserID:     user.ID,
-		Username:   user.Username,
-		AssignedAt: currentTime,
-	}
-
 	// Create the UserHashedPasswordLog
+	currentTime := time.Now()
 	userHashedPasswordLog := commonuser.UserHashedPasswordLog{
 		ID:             primitive.NewObjectID(),
 		UserID:         user.ID,
@@ -163,31 +136,39 @@ func (u *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail
 		AssignedAt:     currentTime,
 	}
 
+	// Create the UserUsernameLog
+	userUsernameLog := commonuser.UserUsernameLog{
+		ID:         primitive.NewObjectID(),
+		UserID:     user.ID,
+		Username:   user.Username,
+		AssignedAt: currentTime,
+	}
+
 	// Run the transaction
 	result, err = session.WithTransaction(ctx, func(ctx mongo.SessionContext) (interface{}, error) {
 		// Create a new email for the user
-		if _, err = u.GetCollection(mongodb.UserEmailCollection).InsertOne(ctx, email); err != nil {
+		if _, err = d.GetCollection(mongodb.UserEmailCollection).InsertOne(ctx, email); err != nil {
 			return nil, err
 		}
 
 		// Create a new phone number for the user
-		if _, err = u.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(ctx, phoneNumber); err != nil {
+		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(ctx, phoneNumber); err != nil {
 			return nil, err
 		}
 
 		// Create a new user
-		userResult, err := u.GetCollection(mongodb.UserCollection).InsertOne(ctx, user)
+		userResult, err := d.GetCollection(mongodb.UserCollection).InsertOne(ctx, user)
 		if err != nil {
 			return nil, err
 		}
 
-		// Create a new user username log
-		if _, err = u.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(ctx, userUsernameLog); err != nil {
+		// Create a new user hashed password log
+		if _, err = d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(ctx, userHashedPasswordLog); err != nil {
 			return nil, err
 		}
 
-		// Create a new user hashed password log
-		if _, err = u.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(ctx, userHashedPasswordLog); err != nil {
+		// Create a new user username log
+		if _, err = d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(ctx, userUsernameLog); err != nil {
 			return nil, err
 		}
 
@@ -203,11 +184,11 @@ func (u *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail
 }
 
 // CreateUserEmail creates a new user email
-func (u *Database) CreateUserEmail(userEmail commonuser.UserEmail) (result *mongo.InsertOneResult, err error) {
-	return u.InsertOne(mongodb.UserEmailCollection, userEmail)
+func (d *Database) CreateUserEmail(userEmail commonuser.UserEmail) (result *mongo.InsertOneResult, err error) {
+	return d.InsertOne(mongodb.UserEmailCollection, userEmail)
 }
 
 // CreateUserPhoneNumber creates a new user phone number
-func (u *Database) CreateUserPhoneNumber(userPhoneNumber commonuser.UserPhoneNumber) (result *mongo.InsertOneResult, err error) {
-	return u.InsertOne(mongodb.UserPhoneNumberCollection, userPhoneNumber)
+func (d *Database) CreateUserPhoneNumber(userPhoneNumber commonuser.UserPhoneNumber) (result *mongo.InsertOneResult, err error) {
+	return d.InsertOne(mongodb.UserPhoneNumberCollection, userPhoneNumber)
 }
