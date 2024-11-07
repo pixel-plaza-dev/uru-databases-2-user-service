@@ -6,39 +6,26 @@ import (
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener"
 	commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/logger"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
-)
-
-const (
-	// FlagLoggerName is the name of the flag logger
-	FlagLoggerName = "Flag"
-
-	// ListenerLoggerName is the name of the listener logger
-	ListenerLoggerName = "Net Listener"
-
-	// EnvironmentLoggerName is the name of the environment logger
-	EnvironmentLoggerName = "Environment"
-
-	// MongoDbLoggerName is the name of the MongoDB logger
-	MongoDbLoggerName = "MongoDB"
-
-	// UserDatabaseLoggerName is the name of the user database logger
-	UserDatabaseLoggerName = "User Database"
+	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
+	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 )
 
 var (
 	// FlagLogger is the logger for the flag
-	FlagLogger = commonflag.NewLogger(commonlogger.NewDefaultLogger(FlagLoggerName))
+	FlagLogger = commonflag.NewLogger(commonlogger.NewDefaultLogger("Flag"))
 
 	// ListenerLogger is the logger for the listener
-	ListenerLogger = commonlistener.NewLogger(commonlogger.NewDefaultLogger(ListenerLoggerName))
+	ListenerLogger = commonlistener.NewLogger(commonlogger.NewDefaultLogger("Net Listener"))
 
 	// EnvironmentLogger is the logger for the environment
-	EnvironmentLogger = commonenv.NewLogger(commonlogger.NewDefaultLogger(EnvironmentLoggerName))
+	EnvironmentLogger = commonenv.NewLogger(commonlogger.NewDefaultLogger("Environment"))
 
 	// MongoDbLogger is the logger for the MongoDB client
-	MongoDbLogger = commonmongodb.NewLogger(commonlogger.NewDefaultLogger(MongoDbLoggerName))
+	MongoDbLogger = commonmongodb.NewLogger(commonlogger.NewDefaultLogger("MongoDB"))
+
+	// UserServerLogger is the logger for the user server
+	UserServerLogger = userserver.NewLogger(commonlogger.NewDefaultLogger("User Server"))
 
 	// UserDatabaseLogger is the logger for the user database
-	UserDatabaseLogger = user.NewLogger(commonlogger.NewDefaultLogger(UserDatabaseLoggerName))
+	UserDatabaseLogger = userdatabase.NewLogger(commonlogger.NewDefaultLogger("User Database"))
 )

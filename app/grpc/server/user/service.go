@@ -1,8 +1,7 @@
 package user
 
 import (
-	commonmessage "github.com/pixel-plaza-dev/uru-databases-2-api-common/message"
-	commoncrypto "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto"
+	"fmt"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
 	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
@@ -20,12 +19,12 @@ import (
 // Server is the gRPC user server
 type Server struct {
 	userDatabase *user.Database
-	logger       user.Logger
+	logger       Logger
 	protobuf.UnimplementedUserServer
 }
 
 // NewServer creates a new gRPC user server
-func NewServer(userDatabase *user.Database, logger user.Logger) *Server {
+func NewServer(userDatabase *user.Database, logger Logger) *Server {
 	return &Server{userDatabase: userDatabase, logger: logger}
 }
 
@@ -38,16 +37,17 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	// Get the request fields
 	usernameField := "username"
 	emailField := "email"
-	hashedPasswordField := "hashed_password"
 	birthDateField := "birth_date"
 
+	fmt.Println(request.GetPassword())
+
 	fieldsToValidate := map[string]string{
-		"Username":       usernameField,
-		"FirstName":      "first_name",
-		"LastName":       "last_name",
-		"HashedPassword": hashedPasswordField,
-		"Email":          emailField,
-		"PhoneNumber":    "phone_number",
+		"Username":    usernameField,
+		"FirstName":   "first_name",
+		"LastName":    "last_name",
+		"Password":    "password",
+		"Email":       emailField,
+		"PhoneNumber": "phone_number",
 	}
 
 	// Check if the required string fields are empty
@@ -56,7 +56,7 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	// Check if the user already exists
 	username := request.GetUsername()
 	if len(username) > 0 {
-		if _, err := s.userDatabase.FindUserByUsername(username); err == nil {
+		if _, err := s.userDatabase.FindUserByUsername(username, nil); err == nil {
 			userExists = true
 			validations[usernameField] = append(validations[usernameField], validator.UsernameTakenError)
 		}
@@ -68,12 +68,6 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 		if _, err = commonvalidator.ValidMailAddress(email); err != nil {
 			validations[emailField] = append(validations[emailField], commonvalidator.InvalidMailAddressError)
 		}
-	}
-
-	// Check if the password is hashed
-	hashedPassword := request.GetHashedPassword()
-	if isHashed := commonbcrypt.IsHashed(hashedPassword); !isHashed {
-		validations[hashedPasswordField] = append(validations[hashedPasswordField], commoncrypto.PasswordNotHashedError)
 	}
 
 	// Check if the birthdate is valid
@@ -92,6 +86,13 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 			return nil, status.Error(codes.AlreadyExists, err.Error())
 		}
 		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Hash the password
+	hashedPassword, err := commonbcrypt.HashPassword(request.GetPassword())
+	if err != nil {
+		s.logger.FailedToHashPassword(err)
+		return nil, InternalError
 	}
 
 	// Create a new user
@@ -127,17 +128,50 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 
 	// Insert the user into the user
 	if _, err = s.userDatabase.CreateUser(&newUser, &newUserEmail, &newUserPhoneNumber); err != nil {
-		// Log the error
-		s.logger.FailedToCreateDocument(err)
 		return nil, InternalError
 	}
 
 	// Log the success
-	s.logger.UserCreated(userId.Hex())
+	s.logger.UserSignedUp(userId.Hex())
 
 	return &protobuf.SignUpResponse{
 		Code:    uint32(codes.OK),
-		Message: commonmessage.SignUpSuccess,
+		Message: SignUpSuccess,
+	}, nil
+}
+
+func (s Server) IsPasswordCorrect(ctx context.Context, request *protobuf.IsPasswordCorrectRequest) (*protobuf.IsPasswordCorrectResponse, error) {
+	// Validation variables
+	validations := make(map[string][]error)
+
+	// Get the request fields
+	fieldsToValidate := map[string]string{
+		"Username": "username",
+		"Password": "password",
+	}
+
+	// Check if the required string fields are empty
+	commonvalidator.ValidNonEmptyStringFields(&validations, request, &fieldsToValidate)
+
+	// Check if there are any validation errors
+	if len(validations) > 0 {
+		err := commonvalidatorerror.FailedValidationError{FieldsErrors: &validations}
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Validate the password and get the user ID
+	userIdentifier, err := s.userDatabase.IsPasswordCorrect(request.GetUsername(), request.GetPassword())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	// Log the password check success
+	s.logger.PasswordCheckSuccess(userIdentifier)
+
+	return &protobuf.IsPasswordCorrectResponse{
+		Code:           uint32(codes.OK),
+		Message:        IsPasswordCorrectSuccess,
+		UserIdentifier: userIdentifier,
 	}, nil
 }
 
@@ -212,5 +246,3 @@ func (s Server) DeleteUser(ctx context.Context, request *protobuf.DeleteUserRequ
 	//TODO implement me
 	panic("implement me")
 }
-
-func (Server) mustEmbedUnimplementedServer() {}

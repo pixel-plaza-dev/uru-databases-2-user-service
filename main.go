@@ -65,7 +65,7 @@ func main() {
 	}
 
 	// Create user database handler
-	userDatabase, err := userdatabase.NewDatabase(mongodbClient, mongoDbName)
+	userDatabase, err := userdatabase.NewDatabase(mongodbClient, mongoDbName, logger.UserDatabaseLogger)
 	if err != nil {
 		panic(err)
 	}
@@ -90,11 +90,11 @@ func main() {
 	// Create a new gRPC server
 	s := grpc.NewServer()
 
-	// Create a new gRPC UsersServiceServer
-	usersServiceServer := userserver.NewServer(userDatabase, logger.UserDatabaseLogger)
+	// Create a new gRPC User Server
+	userServer := userserver.NewServer(userDatabase, logger.UserServerLogger)
 
 	// Register the user server with the gRPC server
-	protobuf.RegisterUserServer(s, usersServiceServer)
+	protobuf.RegisterUserServer(s, userServer)
 	logger.ListenerLogger.ServerStarted(servicePort.Port)
 
 	// Serve the gRPC server

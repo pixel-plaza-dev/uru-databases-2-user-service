@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
@@ -17,10 +18,11 @@ type Database struct {
 	database    *mongo.Database
 	collections *map[string]*commonmongodb.Collection
 	client      *mongo.Client
+	logger      Logger
 }
 
 // NewDatabase creates a new MongoDB user database handler
-func NewDatabase(client *mongo.Client, databaseName string) (database *Database, err error) {
+func NewDatabase(client *mongo.Client, databaseName string, logger Logger) (database *Database, err error) {
 	// Get the user service database
 	userServiceDb := client.Database(databaseName)
 
@@ -38,7 +40,7 @@ func NewDatabase(client *mongo.Client, databaseName string) (database *Database,
 	}
 
 	// Create the user database instance
-	instance := &Database{client: client, database: userServiceDb, collections: &collections}
+	instance := &Database{client: client, database: userServiceDb, collections: &collections, logger: logger}
 
 	return instance, nil
 }
@@ -63,28 +65,6 @@ func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Co
 	return d.database.Collection(collection.Name)
 }
 
-// FindUser finds a user
-func (d *Database) FindUser(filter bson.M) (user *commonuser.User, err error) {
-	// Create the context
-	ctx, cancelFunc := d.GetQueryContext()
-	defer cancelFunc()
-
-	// Find the user
-	err = d.GetCollection(mongodb.UserCollection).FindOne(ctx, filter).Decode(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-// FindUserByUsername finds a user by username
-func (d *Database) FindUserByUsername(username string) (user *commonuser.User, err error) {
-	// Create the filter
-	filter := bson.M{"username": username}
-	return d.FindUser(filter)
-}
-
 // InsertOne inserts a document into a collection
 func (d *Database) InsertOne(collection *commonmongodb.Collection, document interface{}) (result *mongo.InsertOneResult, err error) {
 	// Create the context
@@ -98,6 +78,34 @@ func (d *Database) InsertOne(collection *commonmongodb.Collection, document inte
 	}
 
 	return result, nil
+}
+
+// FindUser finds a user
+func (d *Database) FindUser(filter bson.M, projection interface{}) (user *commonuser.User, err error) {
+	// Create the context
+	ctx, cancelFunc := d.GetQueryContext()
+	defer cancelFunc()
+
+	// Create the find options
+	if projection == nil {
+		projection = bson.M{"_id": 1}
+	}
+	findOptions := options.FindOne().SetProjection(projection)
+
+	// Find the user
+	err = d.GetCollection(mongodb.UserCollection).FindOne(ctx, filter, findOptions).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// FindUserByUsername finds a user by username
+func (d *Database) FindUserByUsername(username string, projection interface{}) (user *commonuser.User, err error) {
+	// Create the filter
+	filter := bson.M{"username": username}
+	return d.FindUser(filter, projection)
 }
 
 // CreateUserUsernameLog creates a new user username log
@@ -177,10 +185,29 @@ func (d *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail
 
 	// Check if there are any errors
 	if err != nil {
+		d.logger.FailedToCreateDocument(err)
 		return nil, err
 	}
 
 	return result, nil
+}
+
+// IsPasswordCorrect checks if the password is correct
+func (d *Database) IsPasswordCorrect(username string, hashedPassword string) (userId string, err error) {
+	// Create the projection
+	projection := bson.M{"_id": 1, "hashed_password": 1}
+
+	// Find the user
+	user, err := d.FindUserByUsername(username, projection)
+	if err != nil {
+		return "", PasswordDoesNotMatchError
+	}
+
+	// Check if the password is correct
+	if commonbcrypt.CheckPasswordHash(hashedPassword, user.HashedPassword) {
+		return user.ID.Hex(), nil
+	}
+	return "", PasswordDoesNotMatchError
 }
 
 // CreateUserEmail creates a new user email

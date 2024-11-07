@@ -17,8 +17,3 @@ func NewLogger(logger commonlogger.Logger) Logger {
 func (l Logger) FailedToCreateDocument(err error) {
 	l.logger.LogMessageWithDetails("Failed to create document", err.Error())
 }
-
-// UserCreated logs a success message when a user is created
-func (l Logger) UserCreated(id string) {
-	l.logger.LogMessageWithDetails("User created", id)
-}

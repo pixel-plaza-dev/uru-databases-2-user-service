@@ -1,7 +1,7 @@
 package user
 
 import (
-	commonmessage "github.com/pixel-plaza-dev/uru-databases-2-api-common/message"
+	commonmessage "github.com/pixel-plaza-dev/uru-databases-2-go-api-common/message"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
