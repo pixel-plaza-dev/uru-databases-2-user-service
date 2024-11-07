@@ -6,7 +6,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pixel-plaza-dev/uru-databases-2-go-api-common v0.0.6
 	github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.9
-	github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.8
+	github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.10
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/net v0.30.0
 	google.golang.org/grpc v1.67.1

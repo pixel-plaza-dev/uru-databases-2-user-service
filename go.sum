@@ -16,6 +16,7 @@ github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.9 h1:9PjM5GScB
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.9/go.mod h1:0ouGRX7Et3yiQ+wVWj4K/5hpnEbzbsl8tzcj+YI/kUg=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.8 h1:WLe/Ltdr4UwUMgnqhAzpibHXI9Ox9h7kiO6H2B37e7s=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.8/go.mod h1:Zusz7ZSuk97Cmg7LyyhQSan7qk2P4rZ26xJgYSjbGJ0=
+github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.10/go.mod h1:Zusz7ZSuk97Cmg7LyyhQSan7qk2P4rZ26xJgYSjbGJ0=
 github.com/xdg-go/pbkdf2 v1.0.0 h1:Su7DPu48wXMwC3bs7MCNG+z4FhcyEuz5dlvchbq0B0c=
 github.com/xdg-go/pbkdf2 v1.0.0/go.mod h1:jrpuAogTd400dnrH08LKmI/xc1MbPOebTwRqcT5RDeI=
 github.com/xdg-go/scram v1.1.2 h1:FHX5I5B4i4hKRVRBCFRxq1iQRej7WO3hhBuJf+UUySY=
