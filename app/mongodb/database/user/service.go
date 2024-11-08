@@ -65,21 +65,6 @@ func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Co
 	return d.database.Collection(collection.Name)
 }
 
-// InsertOne inserts a document into a collection
-func (d *Database) InsertOne(collection *commonmongodb.Collection, document interface{}) (result *mongo.InsertOneResult, err error) {
-	// Create the context
-	ctx, cancelFunc := d.GetQueryContext()
-	defer cancelFunc()
-
-	// Insert the document
-	result, err = d.GetCollection(collection).InsertOne(ctx, document)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
-}
-
 // FindUser finds a user
 func (d *Database) FindUser(filter bson.M, projection interface{}) (user *commonuser.User, err error) {
 	// Create the context
@@ -106,16 +91,6 @@ func (d *Database) FindUserByUsername(username string, projection interface{}) (
 	// Create the filter
 	filter := bson.M{"username": username}
 	return d.FindUser(filter, projection)
-}
-
-// CreateUserUsernameLog creates a new user username log
-func (d *Database) CreateUserUsernameLog(userUsernameLog commonuser.UserUsernameLog) (result *mongo.InsertOneResult, err error) {
-	return d.InsertOne(mongodb.UserUsernameLogCollection, userUsernameLog)
-}
-
-// CreateUserHashedPasswordLog creates a new user hashed password log
-func (d *Database) CreateUserHashedPasswordLog(userHashedPasswordLog *commonuser.UserHashedPasswordLog) (result *mongo.InsertOneResult, err error) {
-	return d.InsertOne(mongodb.UserHashedPasswordLogCollection, userHashedPasswordLog)
 }
 
 // CreateUser creates a new user
@@ -210,12 +185,54 @@ func (d *Database) IsPasswordCorrect(username string, hashedPassword string) (us
 	return "", PasswordDoesNotMatchError
 }
 
-// CreateUserEmail creates a new user email
-func (d *Database) CreateUserEmail(userEmail commonuser.UserEmail) (result *mongo.InsertOneResult, err error) {
-	return d.InsertOne(mongodb.UserEmailCollection, userEmail)
+// UpdateUserField updates a user field
+func (d *Database) UpdateUserField(userId string, field string, value interface{}) (result *mongo.UpdateResult, err error) {
+	// Create the filter
+	filter := bson.M{"_id": userId}
+
+	// Create the update
+	update := bson.M{"$set": bson.M{field: value}}
+
+	// Create the context
+	ctx, cancelFunc := d.GetQueryContext()
+	defer cancelFunc()
+
+	// Update the user
+	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, update)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
-// CreateUserPhoneNumber creates a new user phone number
-func (d *Database) CreateUserPhoneNumber(userPhoneNumber commonuser.UserPhoneNumber) (result *mongo.InsertOneResult, err error) {
-	return d.InsertOne(mongodb.UserPhoneNumberCollection, userPhoneNumber)
+// UpdateUserPassword updates a user password
+func (d *Database) UpdateUserPassword(userId string, hashedPassword string) (result *mongo.UpdateResult, err error) {
+	return d.UpdateUserField(userId, "hashed_password", hashedPassword)
+}
+
+// UpdateUserUsername updates a user username
+func (d *Database) UpdateUserUsername(userId string, username string) (result *mongo.UpdateResult, err error) {
+	return d.UpdateUserField(userId, "username", username)
+}
+
+// UpdateUser updates a user
+func (d *Database) UpdateUser(user *commonuser.User) (result *mongo.UpdateResult, err error) {
+	// Create the filter
+	filter := bson.M{"_id": user.ID}
+
+	// Create the update
+	update := bson.M{"$set": user}
+
+	// Create the context
+	ctx, cancelFunc := d.GetQueryContext()
+	defer cancelFunc()
+
+	// Update the user
+	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, update)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

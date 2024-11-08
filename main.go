@@ -2,19 +2,26 @@ package main
 
 import (
 	"flag"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/flag"
+	commonauthinterceptor "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/grpc/server/interceptor/auth"
+	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt"
+	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt/validator"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
+	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/interceptor/auth"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
+	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc"
 	"net"
+	"time"
 )
 
 // Load environment variables
@@ -52,6 +59,12 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
 
+	// Get the JWT public key
+	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
+	if err != nil {
+		panic(err)
+	}
+
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
@@ -87,10 +100,32 @@ func main() {
 		}
 	}()
 
-	// Create a new gRPC server
-	s := grpc.NewServer()
+	// Create JWT validator
+	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(jwtPublicKey, func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
+		// Get the expiration time
+		exp, err := claims.GetExpirationTime()
+		if err != nil {
+			return nil, commonjwt.InvalidClaimsError
+		}
 
-	// Create a new gRPC User Server
+		// Check if the token is expired
+		if exp.Before(time.Now()) {
+			return nil, commonjwt.TokenExpiredError
+		}
+		return claims, nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// Create gRPC Authentication interceptor
+	authInterceptor := commonauthinterceptor.NewInterceptor(jwtValidator, auth.MethodsToIntercept)
+
+	// Create a new gRPC server
+	s := grpc.NewServer(grpc.ChainUnaryInterceptor(
+		authInterceptor.UnaryServerInterceptor()))
+
+	// Create a new gRPC user server
 	userServer := userserver.NewServer(userDatabase, logger.UserServerLogger)
 
 	// Register the user server with the gRPC server

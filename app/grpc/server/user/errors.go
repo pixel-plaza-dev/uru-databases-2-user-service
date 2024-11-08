@@ -7,5 +7,6 @@ import (
 )
 
 var (
-	InternalError = status.Error(codes.Internal, commonmessage.Internal)
+	InternalServerError = status.Error(codes.Internal, commonmessage.InternalServerError)
+	InDevelopmentError  = status.Error(codes.Internal, "in development")
 )

@@ -9,5 +9,7 @@
 /**/*.exe
 
 # Private and public keys
+/keys
 /**/*.ed
 /**/*.pub
+/**/*.pem

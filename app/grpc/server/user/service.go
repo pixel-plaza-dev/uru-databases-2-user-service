@@ -1,7 +1,6 @@
 package user
 
 import (
-	"fmt"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
 	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
@@ -39,22 +38,24 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	emailField := "email"
 	birthDateField := "birth_date"
 
-	fmt.Println(request.GetPassword())
-
-	fieldsToValidate := map[string]string{
-		"Username":    usernameField,
-		"FirstName":   "first_name",
-		"LastName":    "last_name",
+	requestFieldsToValidate := map[string]string{
 		"Password":    "password",
 		"Email":       emailField,
 		"PhoneNumber": "phone_number",
 	}
 
+	profileFieldsToValidate := map[string]string{
+		"Username":  usernameField,
+		"FirstName": "first_name",
+		"LastName":  "last_name",
+	}
+
 	// Check if the required string fields are empty
-	commonvalidator.ValidNonEmptyStringFields(&validations, request, &fieldsToValidate)
+	commonvalidator.ValidNonEmptyStringFields(&validations, request, &requestFieldsToValidate)
+	commonvalidator.ValidNonEmptyStringFields(&validations, request.GetProfile(), &profileFieldsToValidate)
 
 	// Check if the user already exists
-	username := request.GetUsername()
+	username := request.GetProfile().GetUsername()
 	if len(username) > 0 {
 		if _, err := s.userDatabase.FindUserByUsername(username, nil); err == nil {
 			userExists = true
@@ -71,7 +72,7 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	}
 
 	// Check if the birthdate is valid
-	birthDateTimestamp := request.GetBirthDate()
+	birthDateTimestamp := request.GetProfile().GetBirthDate()
 	birthDate := birthDateTimestamp.AsTime()
 	currentTime := time.Now()
 	if birthDateTimestamp == nil || birthDate.After(currentTime) {
@@ -92,7 +93,7 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	hashedPassword, err := commonbcrypt.HashPassword(request.GetPassword())
 	if err != nil {
 		s.logger.FailedToHashPassword(err)
-		return nil, InternalError
+		return nil, InternalServerError
 	}
 
 	// Create a new user
@@ -100,8 +101,8 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 	newUser := commonuser.User{
 		ID:             userId,
 		Username:       username,
-		FirstName:      request.GetFirstName(),
-		LastName:       request.GetLastName(),
+		FirstName:      request.GetProfile().GetFirstName(),
+		LastName:       request.GetProfile().GetLastName(),
 		HashedPassword: hashedPassword,
 		BirthDate:      birthDate,
 	}
@@ -128,7 +129,7 @@ func (s Server) SignUp(ctx context.Context, request *protobuf.SignUpRequest) (re
 
 	// Insert the user into the user
 	if _, err = s.userDatabase.CreateUser(&newUser, &newUserEmail, &newUserPhoneNumber); err != nil {
-		return nil, InternalError
+		return nil, InternalServerError
 	}
 
 	// Log the success
@@ -169,80 +170,94 @@ func (s Server) IsPasswordCorrect(ctx context.Context, request *protobuf.IsPassw
 	s.logger.PasswordCheckSuccess(userIdentifier)
 
 	return &protobuf.IsPasswordCorrectResponse{
-		Code:           uint32(codes.OK),
-		Message:        IsPasswordCorrectSuccess,
-		UserIdentifier: userIdentifier,
+		Code:    uint32(codes.OK),
+		Message: IsPasswordCorrectSuccess,
+		UserId:  userIdentifier,
 	}, nil
 }
 
 // UpdateProfile updates the user's profile
 func (s Server) UpdateProfile(ctx context.Context, request *protobuf.UpdateProfileRequest) (*protobuf.UpdateProfileResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
+}
+
+func (s Server) GetProfile(ctx context.Context, request *protobuf.GetProfileRequest) (*protobuf.GetProfileResponse, error) {
+	return nil, InDevelopmentError
+}
+
+func (s Server) GetFullProfile(ctx context.Context, request *protobuf.GetFullProfileRequest) (*protobuf.GetFullProfileResponse, error) {
+	return nil, InDevelopmentError
 }
 
 // ChangeUsername changes the user's username
 func (s Server) ChangeUsername(ctx context.Context, request *protobuf.ChangeUsernameRequest) (*protobuf.ChangeUsernameResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
 // ChangePassword changes the user's password
 func (s Server) ChangePassword(ctx context.Context, request *protobuf.ChangePasswordRequest) (*protobuf.ChangePasswordResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
-// ChangeEmail changes the user's email
-func (s Server) ChangeEmail(ctx context.Context, request *protobuf.ChangeEmailRequest) (*protobuf.ChangeEmailResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (s Server) AddEmail(ctx context.Context, request *protobuf.AddEmailRequest) (*protobuf.AddEmailResponse, error) {
+	return nil, InDevelopmentError
+}
+
+func (s Server) DeleteEmail(ctx context.Context, request *protobuf.DeleteEmailRequest) (*protobuf.DeleteEmailResponse, error) {
+	return nil, InDevelopmentError
+}
+
+func (s Server) SendVerificationEmail(ctx context.Context, request *protobuf.SendVerificationEmailRequest) (*protobuf.SendVerificationEmailResponse, error) {
+	return nil, InDevelopmentError
+}
+
+func (s Server) GetPrimaryEmail(ctx context.Context, request *protobuf.GetPrimaryEmailRequest) (*protobuf.GetPrimaryEmailResponse, error) {
+	return nil, InDevelopmentError
+}
+
+func (s Server) ChangePrimaryEmail(ctx context.Context, request *protobuf.ChangePrimaryEmailRequest) (*protobuf.ChangePrimaryEmailResponse, error) {
+	return nil, InDevelopmentError
 }
 
 // VerifyEmail verifies the user's email
 func (s Server) VerifyEmail(ctx context.Context, request *protobuf.VerifyEmailRequest) (*protobuf.VerifyEmailResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
 // GetActiveEmails gets the user's active emails
 func (s Server) GetActiveEmails(ctx context.Context, request *protobuf.GetActiveEmailsRequest) (*protobuf.GetActiveEmailsResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
 // ChangePhoneNumber changes the user's phone number
 func (s Server) ChangePhoneNumber(ctx context.Context, request *protobuf.ChangePhoneNumberRequest) (*protobuf.ChangePhoneNumberResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
+}
+
+func (s Server) GetPhoneNumber(ctx context.Context, request *protobuf.GetPhoneNumberRequest) (*protobuf.GetPhoneNumberResponse, error) {
+	return nil, InDevelopmentError
 }
 
 // VerifyPhoneNumber verifies the user's phone number
 func (s Server) VerifyPhoneNumber(ctx context.Context, request *protobuf.VerifyPhoneNumberRequest) (*protobuf.VerifyPhoneNumberResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
-// GetActivePhoneNumbers gets the user's active phone numbers
-func (s Server) GetActivePhoneNumbers(ctx context.Context, request *protobuf.GetActivePhoneNumbersRequest) (*protobuf.GetActivePhoneNumbersResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (s Server) SendVerificationPhoneNumber(ctx context.Context, request *protobuf.SendVerificationPhoneNumberRequest) (*protobuf.SendVerificationPhoneNumberResponse, error) {
+	return nil, InDevelopmentError
 }
 
 // ForgotPassword sends a password reset link to the user's email
 func (s Server) ForgotPassword(ctx context.Context, request *protobuf.ForgotPasswordRequest) (*protobuf.ForgotPasswordResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
 // ResetPassword resets the user's password
 func (s Server) ResetPassword(ctx context.Context, request *protobuf.ResetPasswordRequest) (*protobuf.ResetPasswordResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
 
 // DeleteUser deletes the user's account
 func (s Server) DeleteUser(ctx context.Context, request *protobuf.DeleteUserRequest) (*protobuf.DeleteUserResponse, error) {
-	//TODO implement me
-	panic("implement me")
+	return nil, InDevelopmentError
 }
