@@ -18,6 +18,8 @@ github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.14 h1:SlzdEnmv
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.14/go.mod h1:0ouGRX7Et3yiQ+wVWj4K/5hpnEbzbsl8tzcj+YI/kUg=
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.16 h1:QfY5jNl/BDMtGqheHM86mbYRPPoFi0e896Mq2hHnvNQ=
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.16/go.mod h1:0ouGRX7Et3yiQ+wVWj4K/5hpnEbzbsl8tzcj+YI/kUg=
+github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.17 h1:o0RQuEtLJnrCitVrRa6yUStzfa5jpAaXXGh+g/NAlu0=
+github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.4.17/go.mod h1:0ouGRX7Et3yiQ+wVWj4K/5hpnEbzbsl8tzcj+YI/kUg=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.17 h1:TKVkIcd+5jVK12q7yV2RuWe/LTsQKf9x7lEtxqD3xZY=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.17/go.mod h1:Zusz7ZSuk97Cmg7LyyhQSan7qk2P4rZ26xJgYSjbGJ0=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.0.18 h1:bn+sUZ9GXrhYaSL7Olb3qMFco81pbJeWEuIyoJ5RW5M=

@@ -5,6 +5,7 @@ import (
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
 	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
 	commonvalidatorerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator/error"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/validator"
@@ -18,13 +19,14 @@ import (
 // Server is the gRPC user server
 type Server struct {
 	userDatabase *user.Database
+	authClient   pbauth.AuthClient
 	logger       Logger
 	protobuf.UnimplementedUserServer
 }
 
 // NewServer creates a new gRPC user server
-func NewServer(userDatabase *user.Database, logger Logger) *Server {
-	return &Server{userDatabase: userDatabase, logger: logger}
+func NewServer(userDatabase *user.Database, authClient pbauth.AuthClient, logger Logger) *Server {
+	return &Server{userDatabase: userDatabase, authClient: authClient, logger: logger}
 }
 
 // SignUp creates a new user

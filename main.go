@@ -6,12 +6,15 @@ import (
 	"github.com/joho/godotenv"
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/flag"
+	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/grpc"
 	commonauthinterceptor "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/grpc/server/interceptor/auth"
 	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt"
 	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt/validator"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
+	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/interceptor/auth"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
@@ -20,6 +23,7 @@ import (
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"net"
 	"time"
 )
@@ -58,6 +62,13 @@ func main() {
 		panic(err)
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
+
+	// Load auth service URI
+	authUri, err := commongrpc.LoadServiceURI(appgrpc.AuthServiceUriKey)
+	if err != nil {
+		panic(err)
+	}
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.AuthServiceUriKey)
 
 	// Get the JWT public key
 	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
@@ -100,6 +111,21 @@ func main() {
 		}
 	}()
 
+	// Connect to auth service gRPC server
+	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+	defer func(conn *grpc.ClientConn) {
+		err = conn.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(authConn)
+
+	// Create auth client
+	authClient := pbauth.NewAuthClient(authConn)
+
 	// Create JWT validator
 	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(jwtPublicKey, func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
 		// Get the expiration time
@@ -126,7 +152,7 @@ func main() {
 		authInterceptor.UnaryServerInterceptor()))
 
 	// Create a new gRPC user server
-	userServer := userserver.NewServer(userDatabase, logger.UserServerLogger)
+	userServer := userserver.NewServer(userDatabase, authClient, logger.UserServerLogger)
 
 	// Register the user server with the gRPC server
 	protobuf.RegisterUserServer(s, userServer)
