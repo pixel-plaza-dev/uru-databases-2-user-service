@@ -47,11 +47,11 @@ func init() {
 
 func main() {
 	// Get the listener port
-	servicePort, err := commonlistener.LoadServicePort(listener.UserServicePortKey)
+	servicePort, err := commonlistener.LoadServicePort(listener.PortKey)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.UserServicePortKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.PortKey)
 
 	// Get the MongoDB URI
 	mongoDbUri, err := commonmongodb.LoadMongoDBURI(mongodb.UriKey)
