@@ -30,17 +30,22 @@ import (
 
 // Load environment variables
 func init() {
+	// Declare flags and parse them
+	commonflag.SetModeFlag()
+	flag.Parse()
+	logger.FlagLogger.ModeFlagSet(commonflag.Mode)
+
+	// Check if the environment is production
+	if commonflag.Mode.IsProd() {
+		return
+	}
+
 	if err := godotenv.Load(); err != nil {
 		panic(commonenv.FailedToLoadEnvironmentVariablesError)
 	}
 }
 
 func main() {
-	// Declare flags and parse them
-	commonflag.SetModeFlag()
-	flag.Parse()
-	logger.FlagLogger.ModeFlagSet(commonflag.Mode)
-
 	// Get the listener port
 	servicePort, err := commonlistener.LoadServicePort(listener.UserServicePortKey)
 	if err != nil {
@@ -63,7 +68,7 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
 
-	// Load auth service URI
+	// Get the auth service URI
 	authUri, err := commongrpc.LoadServiceURI(appgrpc.AuthServiceUriKey)
 	if err != nil {
 		panic(err)
