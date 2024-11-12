@@ -23,7 +23,7 @@ import (
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials"
 	"net"
 	"time"
 )
@@ -75,12 +75,6 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.AuthServiceUriKey)
 
-	// Get the JWT public key
-	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
-	if err != nil {
-		panic(err)
-	}
-
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
@@ -116,8 +110,14 @@ func main() {
 		}
 	}()
 
+	// Load the CA certificate for the Auth service
+	authGrpcCredentials, err := commongrpc.LoadTLSCredentials(appgrpc.AuthServiceCaPath)
+	if err != nil {
+		panic(err)
+	}
+
 	// Connect to auth service gRPC server
-	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(authGrpcCredentials))
 	if err != nil {
 		panic(err)
 	}
@@ -131,8 +131,14 @@ func main() {
 	// Create auth client
 	authClient := pbauth.NewAuthClient(authConn)
 
+	// Read the JWT public key
+	jwtFile, err := commonjwt.ReadJwtKey(appjwt.JwtPublicKeyPath)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create JWT validator
-	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(jwtPublicKey, func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
+	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(jwtFile, func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
 		// Get the expiration time
 		exp, err := claims.GetExpirationTime()
 		if err != nil {
@@ -152,9 +158,16 @@ func main() {
 	// Create gRPC Authentication interceptor
 	authInterceptor := commonauthinterceptor.NewInterceptor(jwtValidator, auth.MethodsToIntercept)
 
+	// Load the TLS certificate and key
+	grpcCredentials, err := credentials.NewServerTLSFromFile(appgrpc.CertificateFilePath, appgrpc.KeyFilePath)
+	if err != nil {
+		panic(err)
+	}
+
 	// Create a new gRPC server
-	s := grpc.NewServer(grpc.ChainUnaryInterceptor(
-		authInterceptor.UnaryServerInterceptor()))
+	s := grpc.NewServer(grpc.Creds(grpcCredentials),
+		grpc.ChainUnaryInterceptor(
+			authInterceptor.UnaryServerInterceptor()))
 
 	// Create a new gRPC user server
 	userServer := userserver.NewServer(userDatabase, authClient, logger.UserServerLogger)

@@ -13,3 +13,11 @@
 /**/*.ed
 /**/*.pub
 /**/*.pem
+
+# Certificates
+/certificates
+
+# Commands
+/**/*.cmd
+/**/*.sh
+/**/*.bat
