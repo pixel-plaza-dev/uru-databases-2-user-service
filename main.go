@@ -110,14 +110,14 @@ func main() {
 		}
 	}()
 
-	// Load the CA certificate for the Auth service
-	authGrpcCredentials, err := commongrpc.LoadTLSCredentials(appgrpc.AuthServiceCaPath)
+	// Load the CA certificate for the Pixel Plaza's services
+	CACredentials, err := commongrpc.LoadTLSCredentials(appgrpc.CACertificatePath)
 	if err != nil {
 		panic(err)
 	}
 
 	// Connect to auth service gRPC server
-	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(authGrpcCredentials))
+	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
 	if err != nil {
 		panic(err)
 	}
@@ -132,7 +132,7 @@ func main() {
 	authClient := pbauth.NewAuthClient(authConn)
 
 	// Read the JWT public key
-	jwtFile, err := commonjwt.ReadJwtKey(appjwt.JwtPublicKeyPath)
+	jwtFile, err := commonjwt.ReadJwtKey(appjwt.PublicKeyPath)
 	if err != nil {
 		panic(err)
 	}

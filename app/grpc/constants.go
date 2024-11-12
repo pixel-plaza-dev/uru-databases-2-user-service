@@ -5,11 +5,11 @@ const (
 	AuthServiceUriKey = "AUTH_SERVICE_HOST"
 
 	// KeyFilePath is the path to the key file
-	KeyFilePath = "certificates/server-key.pem"
+	KeyFilePath = "certificates/user-service/server-key.pem"
 
 	// CertificateFilePath is the path to the certificate file
-	CertificateFilePath = "certificates/server-cert.pem"
+	CertificateFilePath = "certificates/user-service/server-cert.pem"
 
-	// AuthServiceCaPath is the path to the CA certificate for the Auth service
-	AuthServiceCaPath = "certificates/ca-cert.pem"
+	// CACertificatePath is the path to the CA certificate
+	CACertificatePath = "certificates/pixel-plaza/ca-cert.pem"
 )
