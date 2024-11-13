@@ -47,7 +47,7 @@ func init() {
 
 func main() {
 	// Get the listener port
-	servicePort, err := commonlistener.LoadServicePort(listener.PortKey)
+	servicePort, err := commonlistener.LoadServicePort("0.0.0.0", listener.PortKey)
 	if err != nil {
 		panic(err)
 	}
@@ -110,26 +110,32 @@ func main() {
 		}
 	}()
 
-	// Load the CA certificate for the Pixel Plaza's services
-	CACredentials, err := commongrpc.LoadTLSCredentials(appgrpc.CACertificatePath)
-	if err != nil {
-		panic(err)
-	}
+	var authClient pbauth.AuthClient
+	var authConn *grpc.ClientConn
 
-	// Connect to auth service gRPC server
-	authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
-	if err != nil {
-		panic(err)
-	}
-	defer func(conn *grpc.ClientConn) {
-		err = conn.Close()
+	// Load the self-signed certificates if the environment is not production. Otherwise, load the IAM certificates
+	if commonflag.Mode.IsDev() {
+		// Load the self-signed CA certificates for the Pixel Plaza's services
+		CACredentials, err := commongrpc.LoadTLSCredentials(appgrpc.CACertificatePath)
 		if err != nil {
 			panic(err)
 		}
-	}(authConn)
+
+		// Connect to auth service gRPC server
+		authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
+		if err != nil {
+			panic(err)
+		}
+		defer func(conn *grpc.ClientConn) {
+			err = conn.Close()
+			if err != nil {
+				panic(err)
+			}
+		}(authConn)
+	}
 
 	// Create auth client
-	authClient := pbauth.NewAuthClient(authConn)
+	authClient = pbauth.NewAuthClient(authConn)
 
 	// Read the JWT public key
 	jwtFile, err := commonjwt.ReadJwtKey(appjwt.PublicKeyPath)
