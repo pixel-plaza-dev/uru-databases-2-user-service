@@ -140,13 +140,19 @@ func main() {
 			panic(err)
 		}
 	} else {
+		// Load system certificates pool
+		systemCredentials, err := commongrpc.LoadSystemCredentials()
+		if err != nil {
+			panic(err)
+		}
+
 		// Load default account credentials
 		tokenSource, err := commongrpc.LoadServiceAccountCredentials(context.Background(), userUri)
 		if err != nil {
 			panic(err)
 		}
 
-		authConn, err = grpc.NewClient(authUri, grpc.WithPerRPCCredentials(tokenSource))
+		authConn, err = grpc.NewClient(authUri, grpc.WithPerRPCCredentials(tokenSource), grpc.WithTransportCredentials(systemCredentials))
 		if err != nil {
 			panic(err)
 		}
