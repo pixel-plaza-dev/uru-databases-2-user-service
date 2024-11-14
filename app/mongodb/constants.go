@@ -6,10 +6,10 @@ import (
 
 const (
 	// UriKey is the key of the MongoDB host
-	UriKey = "MONGO_DB_HOST"
+	UriKey = "USER_SERVICE_MONGODB_HOST"
 
 	// DbNameKey is the key of the MongoDB database name
-	DbNameKey = "MONGO_DB_NAME"
+	DbNameKey = "USER_SERVICE_MONGODB_NAME"
 )
 
 var (

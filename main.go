@@ -75,6 +75,13 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.AuthServiceUriKey)
 
+	// Get the JWT public key
+	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
+	if err != nil {
+		panic(err)
+	}
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(appjwt.PublicKey)
+
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
@@ -110,10 +117,9 @@ func main() {
 		}
 	}()
 
-	var authClient pbauth.AuthClient
+	// Connect to auth service gRPC server
 	var authConn *grpc.ClientConn
 
-	// Load the self-signed certificates if the environment is not production. Otherwise, load the IAM certificates
 	if commonflag.Mode.IsDev() {
 		// Load the self-signed CA certificates for the Pixel Plaza's services
 		CACredentials, err := commongrpc.LoadTLSCredentials(appgrpc.CACertificatePath)
@@ -121,30 +127,28 @@ func main() {
 			panic(err)
 		}
 
-		// Connect to auth service gRPC server
-		authConn, err := grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
+		authConn, err = grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
 		if err != nil {
 			panic(err)
 		}
-		defer func(conn *grpc.ClientConn) {
-			err = conn.Close()
-			if err != nil {
-				panic(err)
-			}
-		}(authConn)
+	} else {
+		authConn, err = grpc.NewClient(authUri)
+		if err != nil {
+			panic(err)
+		}
 	}
+	defer func(conn *grpc.ClientConn) {
+		err = conn.Close()
+		if err != nil {
+			panic(err)
+		}
+	}(authConn)
 
 	// Create auth client
-	authClient = pbauth.NewAuthClient(authConn)
-
-	// Read the JWT public key
-	jwtFile, err := commonjwt.ReadJwtKey(appjwt.PublicKeyPath)
-	if err != nil {
-		panic(err)
-	}
+	authClient := pbauth.NewAuthClient(authConn)
 
 	// Create JWT validator
-	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(jwtFile, func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
+	jwtValidator, err := commonjwtvalidator.NewDefaultValidator([]byte(jwtPublicKey), func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
 		// Get the expiration time
 		exp, err := claims.GetExpirationTime()
 		if err != nil {
@@ -164,16 +168,23 @@ func main() {
 	// Create gRPC Authentication interceptor
 	authInterceptor := commonauthinterceptor.NewInterceptor(jwtValidator, auth.MethodsToIntercept)
 
-	// Load the TLS certificate and key
-	grpcCredentials, err := credentials.NewServerTLSFromFile(appgrpc.CertificateFilePath, appgrpc.KeyFilePath)
-	if err != nil {
-		panic(err)
-	}
-
 	// Create a new gRPC server
-	s := grpc.NewServer(grpc.Creds(grpcCredentials),
-		grpc.ChainUnaryInterceptor(
+	var s *grpc.Server
+
+	if commonflag.Mode.IsDev() {
+		// Load the TLS certificate and key
+		grpcTransportCredentials, err := credentials.NewServerTLSFromFile(appgrpc.CertificateFilePath, appgrpc.KeyFilePath)
+		if err != nil {
+			panic(err)
+		}
+
+		s = grpc.NewServer(grpc.Creds(grpcTransportCredentials),
+			grpc.ChainUnaryInterceptor(
+				authInterceptor.UnaryServerInterceptor()))
+	} else {
+		s = grpc.NewServer(grpc.ChainUnaryInterceptor(
 			authInterceptor.UnaryServerInterceptor()))
+	}
 
 	// Create a new gRPC user server
 	userServer := userserver.NewServer(userDatabase, authClient, logger.UserServerLogger)
