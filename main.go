@@ -22,6 +22,7 @@ import (
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"net"
@@ -75,6 +76,13 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.AuthServiceUriKey)
 
+	// Get the user service URI
+	userUri, err := commongrpc.LoadServiceURI(appgrpc.UserServiceUriKey)
+	if err != nil {
+		panic(err)
+	}
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.UserServiceUriKey)
+
 	// Get the JWT public key
 	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
 	if err != nil {
@@ -117,7 +125,7 @@ func main() {
 		}
 	}()
 
-	// Connect to auth service gRPC server
+	// Connect to gRPC servers
 	var authConn *grpc.ClientConn
 
 	if commonflag.Mode.IsDev() {
@@ -132,7 +140,13 @@ func main() {
 			panic(err)
 		}
 	} else {
-		authConn, err = grpc.NewClient(authUri)
+		// Load default account credentials
+		tokenSource, err := commongrpc.LoadServiceAccountCredentials(context.Background(), userUri)
+		if err != nil {
+			panic(err)
+		}
+
+		authConn, err = grpc.NewClient(authUri, grpc.WithPerRPCCredentials(tokenSource))
 		if err != nil {
 			panic(err)
 		}
