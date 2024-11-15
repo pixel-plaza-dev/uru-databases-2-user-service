@@ -4,3 +4,5 @@ services:
     container_name: uru-databases-2-user-service
     ports:
       - "8080:8080"
+    env_file:
+      - .env

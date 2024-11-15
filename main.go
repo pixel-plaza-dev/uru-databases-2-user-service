@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
@@ -22,7 +23,6 @@ import (
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"net"
@@ -164,7 +164,7 @@ func main() {
 		}
 	}(authConn)
 
-	// Create auth client
+	// Create gRPC server clients
 	authClient := pbauth.NewAuthClient(authConn)
 
 	// Create JWT validator
