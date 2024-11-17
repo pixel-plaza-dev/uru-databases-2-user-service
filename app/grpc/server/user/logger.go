@@ -1,6 +1,6 @@
 package user
 
-import commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/logger"
+import commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/logger"
 
 type Logger struct {
 	logger commonlogger.Logger

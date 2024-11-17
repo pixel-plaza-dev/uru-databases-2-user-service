@@ -3,8 +3,8 @@ package user
 import (
 	"context"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
-	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
-	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
+	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
+	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"

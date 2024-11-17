@@ -21,3 +21,7 @@
 /**/*.cmd
 /**/*.sh
 /**/*.bat
+
+# Service account keys
+/iam
+/**/service-account.json

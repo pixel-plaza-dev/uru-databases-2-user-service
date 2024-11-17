@@ -2,9 +2,9 @@ package user
 
 import (
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
-	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb/database/user"
-	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator"
-	commonvalidatorerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/validator/error"
+	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
+	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/validator"
+	commonvalidatorerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/validator/error"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"

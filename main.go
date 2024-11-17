@@ -5,14 +5,16 @@ import (
 	"flag"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
-	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/env"
-	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/flag"
-	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/grpc"
-	commonauthinterceptor "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/grpc/server/interceptor/auth"
-	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt"
-	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/jwt/validator"
-	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/listener"
-	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	commongcloud "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/cloud/gcloud"
+	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/env"
+	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/flag"
+	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt"
+	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
+	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
+	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc"
+	commonauthinterceptor "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/server/interceptor/auth"
+	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/listener"
+	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/tls"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
@@ -130,7 +132,7 @@ func main() {
 
 	if commonflag.Mode.IsDev() {
 		// Load the self-signed CA certificates for the Pixel Plaza's services
-		CACredentials, err := commongrpc.LoadTLSCredentials(appgrpc.CACertificatePath)
+		CACredentials, err := commontls.LoadTLSCredentials(appgrpc.CACertificatePath)
 		if err != nil {
 			panic(err)
 		}
@@ -141,13 +143,13 @@ func main() {
 		}
 	} else {
 		// Load system certificates pool
-		systemCredentials, err := commongrpc.LoadSystemCredentials()
+		systemCredentials, err := commontls.LoadSystemCredentials()
 		if err != nil {
 			panic(err)
 		}
 
 		// Load default account credentials
-		tokenSource, err := commongrpc.LoadServiceAccountCredentials(context.Background(), userUri)
+		tokenSource, err := commongcloud.LoadServiceAccountCredentials(context.Background(), userUri)
 		if err != nil {
 			panic(err)
 		}

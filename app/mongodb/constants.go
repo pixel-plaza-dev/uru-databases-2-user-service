@@ -1,7 +1,7 @@
 package mongodb
 
 import (
-	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/mongodb"
+	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 )
 
 const (

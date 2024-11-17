@@ -11,9 +11,6 @@
 # Executable files
 /**/*.exe
 
-# Certificates
-/certificates
-
 # Commands
 /**/*.cmd
 /**/*.sh
