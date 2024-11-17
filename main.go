@@ -12,13 +12,14 @@ import (
 	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc"
-	commonauthinterceptor "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/server/interceptor/auth"
+	clientauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/client/interceptor/auth"
+	serverauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/server/interceptor/auth"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/listener"
 	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/tls"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
+	detailsauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf-details/auth"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/interceptor/auth"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
@@ -92,6 +93,14 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(appjwt.PublicKey)
 
+	// Get the User Service account token source
+	tokenSource, err := commongcloud.LoadServiceAccountCredentials(
+		context.Background(), userUri,
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
 
@@ -127,42 +136,44 @@ func main() {
 		}
 	}()
 
-	// Connect to gRPC servers
-	var authConn *grpc.ClientConn
+	// Load transport credentials
+	var transportCredentials credentials.TransportCredentials
 
 	if commonflag.Mode.IsDev() {
-		// Load the self-signed CA certificates for the Pixel Plaza's services
-		CACredentials, err := commontls.LoadTLSCredentials(appgrpc.CACertificatePath)
-		if err != nil {
-			panic(err)
-		}
-
-		authConn, err = grpc.NewClient(authUri, grpc.WithTransportCredentials(CACredentials))
+		transportCredentials, err = credentials.NewServerTLSFromFile(
+			appgrpc.ServerCertPath, appgrpc.ServerKeyPath,
+		)
 		if err != nil {
 			panic(err)
 		}
 	} else {
 		// Load system certificates pool
-		systemCredentials, err := commontls.LoadSystemCredentials()
-		if err != nil {
-			panic(err)
-		}
-
-		// Load default account credentials
-		tokenSource, err := commongcloud.LoadServiceAccountCredentials(context.Background(), userUri)
-		if err != nil {
-			panic(err)
-		}
-
-		authConn, err = grpc.NewClient(authUri, grpc.WithPerRPCCredentials(tokenSource), grpc.WithTransportCredentials(systemCredentials))
+		transportCredentials, err = commontls.LoadSystemCredentials()
 		if err != nil {
 			panic(err)
 		}
 	}
-	defer func(conn *grpc.ClientConn) {
-		err = conn.Close()
-		if err != nil {
-			panic(err)
+
+	// Create client authentication interceptor
+	clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSource)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create gRPC connections
+	authConn, err := grpc.NewClient(
+		authUri, grpc.WithTransportCredentials(transportCredentials),
+		grpc.WithChainUnaryInterceptor(clientAuthInterceptor.Authenticate()),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer func(conns ...*grpc.ClientConn) {
+		for _, conn := range conns {
+			err = conn.Close()
+			if err != nil {
+				panic(err)
+			}
 		}
 	}(authConn)
 
@@ -187,28 +198,15 @@ func main() {
 		panic(err)
 	}
 
-	// Create gRPC Authentication interceptor
-	authInterceptor := commonauthinterceptor.NewInterceptor(jwtValidator, auth.MethodsToIntercept)
+	// Create server authentication interceptor
+	serverAuthInterceptor := serverauth.NewInterceptor(jwtValidator, detailsauth.MethodsToIntercept)
 
-	// Create a new gRPC server
-	var s *grpc.Server
+	// Create the gRPC server
+	s := grpc.NewServer(grpc.Creds(transportCredentials),
+		grpc.ChainUnaryInterceptor(
+			serverAuthInterceptor.Authenticate()))
 
-	if commonflag.Mode.IsDev() {
-		// Load the TLS certificate and key
-		grpcTransportCredentials, err := credentials.NewServerTLSFromFile(appgrpc.CertificateFilePath, appgrpc.KeyFilePath)
-		if err != nil {
-			panic(err)
-		}
-
-		s = grpc.NewServer(grpc.Creds(grpcTransportCredentials),
-			grpc.ChainUnaryInterceptor(
-				authInterceptor.UnaryServerInterceptor()))
-	} else {
-		s = grpc.NewServer(grpc.ChainUnaryInterceptor(
-			authInterceptor.UnaryServerInterceptor()))
-	}
-
-	// Create a new gRPC user server
+	// Create the gRPC user server
 	userServer := userserver.NewServer(userDatabase, authClient, logger.UserServerLogger)
 
 	// Register the user server with the gRPC server
