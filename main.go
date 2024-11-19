@@ -28,6 +28,7 @@ import (
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"net"
 	"time"
 )
@@ -207,7 +208,7 @@ func main() {
 	serverAuthInterceptor := serverauth.NewInterceptor(jwtValidator, detailsauth.MethodsToIntercept)
 
 	// Create the gRPC server
-	s := grpc.NewServer(grpc.Creds(transportCredentials),
+	s := grpc.NewServer(grpc.Creds(insecure.NewCredentials()),
 		grpc.ChainUnaryInterceptor(
 			serverAuthInterceptor.Authenticate()))
 
