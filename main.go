@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/credentials/oauth"
 	"net"
 	"time"
 )
@@ -97,12 +98,16 @@ func main() {
 	// gRPC servers URI
 	var uris = []string{authUri}
 
-	// Get the user service account token source
-	tokenSource, err := commongcloud.LoadServiceAccountCredentials(
-		context.Background(), userUri,
-	)
-	if err != nil {
-		panic(err)
+	// Get the service account token source for each gRPC server URI
+	var tokenSources = make(map[string]*oauth.TokenSource)
+	for _, uri := range uris {
+		tokenSource, err := commongcloud.LoadServiceAccountCredentials(
+			context.Background(), userUri,
+		)
+		if err != nil {
+			panic(err)
+		}
+		tokenSources[uri] = tokenSource
 	}
 
 	// Get the MongoDB configuration
@@ -159,16 +164,20 @@ func main() {
 	}
 
 	// Create client authentication interceptors
-	clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSource)
-	if err != nil {
-		panic(err)
+	var clientAuthInterceptors = make(map[string]*clientauth.Interceptor)
+	for uri, tokenSource := range tokenSources {
+		clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSource)
+		if err != nil {
+			panic(err)
+		}
+		clientAuthInterceptors[uri] = clientAuthInterceptor
 	}
 
 	// Create gRPC connections
 	var conns = make(map[string]*grpc.ClientConn)
 	for _, uri := range uris {
 		conn, err := grpc.NewClient(uri, grpc.WithTransportCredentials(transportCredentials),
-			grpc.WithChainUnaryInterceptor(clientAuthInterceptor.Authenticate()))
+			grpc.WithChainUnaryInterceptor(clientAuthInterceptors[uri].Authenticate()))
 		if err != nil {
 			panic(err)
 		}
