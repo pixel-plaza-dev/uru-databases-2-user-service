@@ -213,7 +213,7 @@ func main() {
 		panic(err)
 	}
 
-	// Create server authentication interceptors
+	// Create server authentication interceptor
 	serverAuthInterceptor, err := serverauth.NewInterceptor(
 		jwtValidator,
 		&detailsuser.GRPCInterceptions,
