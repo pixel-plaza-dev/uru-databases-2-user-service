@@ -4,7 +4,7 @@ import (
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/flag"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
-	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/listener"
+	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
 	commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/logger"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"

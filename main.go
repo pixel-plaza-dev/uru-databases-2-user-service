@@ -3,22 +3,22 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/joho/godotenv"
 	commongcloud "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/cloud/gcloud"
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/flag"
 	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt"
 	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
+	commonjwtvalidatorgrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator/grpc"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
-	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc"
-	clientauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/client/interceptor/auth"
-	serverauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/grpc/server/interceptor/auth"
-	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/listener"
-	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/server/tls"
-	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/auth"
-	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled-protobuf/user"
-	detailsauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf-details/auth"
+	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc"
+	clientauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/interceptor/auth"
+	serverauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/interceptor/auth"
+	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
+	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/tls"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
+	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
+	detailsuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/details/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/credentials/oauth"
 	"net"
-	"time"
 )
 
 // Load environment variables
@@ -53,7 +52,10 @@ func init() {
 
 func main() {
 	// Get the listener port
-	servicePort, err := commonlistener.LoadServicePort("0.0.0.0", listener.PortKey)
+	servicePort, err := commonlistener.LoadServicePort(
+		"0.0.0.0",
+		listener.PortKey,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -74,19 +76,16 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
 
-	// Get the user service URI
-	userUri, err := commongrpc.LoadServiceURI(appgrpc.UserServiceUriKey)
-	if err != nil {
-		panic(err)
+	// Get the gRPC services URI
+	var uris = make(map[string]string)
+	for _, key := range []string{appgrpc.AuthServiceUriKey} {
+		uri, err := commongrpc.LoadServiceURI(key)
+		if err != nil {
+			panic(err)
+		}
+		logger.EnvironmentLogger.EnvironmentVariableLoaded(key)
+		uris[key] = uri
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.UserServiceUriKey)
-
-	// Get the auth service URI
-	authUri, err := commongrpc.LoadServiceURI(appgrpc.AuthServiceUriKey)
-	if err != nil {
-		panic(err)
-	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(appgrpc.AuthServiceUriKey)
 
 	// Get the JWT public key
 	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
@@ -95,23 +94,29 @@ func main() {
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(appjwt.PublicKey)
 
-	// gRPC servers URI
-	var uris = []string{authUri}
+	// Load Google Cloud service account credentials
+	googleCredentials, err := commongcloud.LoadGoogleCredentials(context.Background())
+	if err != nil {
+		panic(err)
+	}
 
 	// Get the service account token source for each gRPC server URI
 	var tokenSources = make(map[string]*oauth.TokenSource)
-	for _, uri := range uris {
+	for key, uri := range uris {
 		tokenSource, err := commongcloud.LoadServiceAccountCredentials(
-			context.Background(), userUri,
+			context.Background(), "https://"+uri, googleCredentials,
 		)
 		if err != nil {
 			panic(err)
 		}
-		tokenSources[uri] = tokenSource
+		tokenSources[key] = tokenSource
 	}
 
 	// Get the MongoDB configuration
-	mongoDbConfig := &commonmongodb.Config{Uri: mongoDbUri, Timeout: mongodb.ConnectionCtxTimeout}
+	mongoDbConfig := &commonmongodb.Config{
+		Uri:     mongoDbUri,
+		Timeout: mongodb.ConnectionCtxTimeout,
+	}
 
 	// Get the connection handler
 	mongodbConnection := commonmongodb.NewDefaultConnectionHandler(mongoDbConfig)
@@ -123,7 +128,11 @@ func main() {
 	}
 
 	// Create user database handler
-	userDatabase, err := userdatabase.NewDatabase(mongodbClient, mongoDbName, logger.UserDatabaseLogger)
+	userDatabase, err := userdatabase.NewDatabase(
+		mongodbClient,
+		mongoDbName,
+		logger.UserDatabaseLogger,
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -149,6 +158,7 @@ func main() {
 	var transportCredentials credentials.TransportCredentials
 
 	if commonflag.Mode.IsDev() {
+		// Load server TLS credentials
 		transportCredentials, err = credentials.NewServerTLSFromFile(
 			appgrpc.ServerCertPath, appgrpc.ServerKeyPath,
 		)
@@ -165,23 +175,25 @@ func main() {
 
 	// Create client authentication interceptors
 	var clientAuthInterceptors = make(map[string]*clientauth.Interceptor)
-	for uri, tokenSource := range tokenSources {
+	for key, tokenSource := range tokenSources {
 		clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSource)
 		if err != nil {
 			panic(err)
 		}
-		clientAuthInterceptors[uri] = clientAuthInterceptor
+		clientAuthInterceptors[key] = clientAuthInterceptor
 	}
 
 	// Create gRPC connections
 	var conns = make(map[string]*grpc.ClientConn)
-	for _, uri := range uris {
-		conn, err := grpc.NewClient(uri, grpc.WithTransportCredentials(transportCredentials),
-			grpc.WithChainUnaryInterceptor(clientAuthInterceptors[uri].Authenticate()))
+	for key, uri := range uris {
+		conn, err := grpc.NewClient(
+			uri, grpc.WithTransportCredentials(transportCredentials),
+			grpc.WithChainUnaryInterceptor(clientAuthInterceptors[key].Authenticate()),
+		)
 		if err != nil {
 			panic(err)
 		}
-		conns[uri] = conn
+		conns[key] = conn
 	}
 	defer func(conns map[string]*grpc.ClientConn) {
 		for _, conn := range conns {
@@ -193,36 +205,48 @@ func main() {
 	}(conns)
 
 	// Create gRPC server clients
-	authClient := pbauth.NewAuthClient(conns[authUri])
+	authClient := pbauth.NewAuthClient(conns[appgrpc.AuthServiceUriKey])
 
-	// Create JWT validator
-	jwtValidator, err := commonjwtvalidator.NewDefaultValidator([]byte(jwtPublicKey), func(claims *jwt.MapClaims) (*jwt.MapClaims, error) {
-		// Get the expiration time
-		exp, err := claims.GetExpirationTime()
-		if err != nil {
-			return nil, commonjwt.InvalidClaimsError
-		}
-
-		// Check if the token is expired
-		if exp.Before(time.Now()) {
-			return nil, commonjwt.TokenExpiredError
-		}
-		return claims, nil
-	})
+	// Create token validator
+	tokenValidator, err := commonjwtvalidatorgrpc.NewDefaultTokenValidator(
+		tokenSources[appgrpc.AuthServiceUriKey], &authClient,
+	)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create server authentication interceptor
-	serverAuthInterceptor := serverauth.NewInterceptor(jwtValidator, detailsauth.MethodsToIntercept)
+	// Create JWT validator
+	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(
+		[]byte(jwtPublicKey),
+		tokenValidator,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Create server authentication interceptors
+	serverAuthInterceptor, err := serverauth.NewInterceptor(
+		jwtValidator,
+		&detailsuser.GRPCInterceptions,
+	)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create the gRPC server
-	s := grpc.NewServer(grpc.Creds(insecure.NewCredentials()),
+	s := grpc.NewServer(
+		grpc.Creds(insecure.NewCredentials()),
 		grpc.ChainUnaryInterceptor(
-			serverAuthInterceptor.Authenticate()))
+			serverAuthInterceptor.Authenticate(),
+		),
+	)
 
 	// Create the gRPC user server
-	userServer := userserver.NewServer(userDatabase, authClient, logger.UserServerLogger)
+	userServer := userserver.NewServer(
+		userDatabase,
+		authClient,
+		logger.UserServerLogger,
+	)
 
 	// Register the user server with the gRPC server
 	protobuf.RegisterUserServer(s, userServer)
