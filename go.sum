@@ -66,6 +66,7 @@ github.com/montanaflynn/stats v0.7.1 h1:etflOAAHORrCC44V+aR6Ftzort912ZU+YLiSTuV8
 github.com/montanaflynn/stats v0.7.1/go.mod h1:etXPPgVO6n31NxCd9KQUMvCM+ve0ruNzt6R8Bnaayow=
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.5.24 h1:gmQInxOCyN9YLsMH5VjM6r/3x/hu+KUfCBiRiG5e7Pg=
 github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.5.24/go.mod h1:qwSDpe6uOpS6xU16lOjJKr/oB/a+nKdln6XfkGbp7DE=
+github.com/pixel-plaza-dev/uru-databases-2-go-service-common v0.5.25/go.mod h1:qwSDpe6uOpS6xU16lOjJKr/oB/a+nKdln6XfkGbp7DE=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.1.17 h1:1FJ3Ysyh1JDmtcE+3PZuxbVkywy1HECG2ANnRb+1LrQ=
 github.com/pixel-plaza-dev/uru-databases-2-protobuf-common v0.1.17/go.mod h1:Zusz7ZSuk97Cmg7LyyhQSan7qk2P4rZ26xJgYSjbGJ0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

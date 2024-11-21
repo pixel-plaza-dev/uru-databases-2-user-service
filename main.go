@@ -143,17 +143,6 @@ func main() {
 	}()
 	logger.MongoDbLogger.ConnectedToMongoDB()
 
-	// Listen on the given port
-	portListener, err := net.Listen("tcp", servicePort.FormattedPort)
-	if err != nil {
-		panic(commonlistener.FailedToListenError)
-	}
-	defer func() {
-		if err := portListener.Close(); err != nil {
-			panic(commonlistener.FailedToCloseError)
-		}
-	}()
-
 	// Load transport credentials
 	var transportCredentials credentials.TransportCredentials
 
@@ -251,6 +240,17 @@ func main() {
 	// Register the user server with the gRPC server
 	protobuf.RegisterUserServer(s, userServer)
 	logger.ListenerLogger.ServerStarted(servicePort.Port)
+
+	// Listen on the given port
+	portListener, err := net.Listen("tcp", servicePort.FormattedPort)
+	if err != nil {
+		panic(commonlistener.FailedToListenError)
+	}
+	defer func() {
+		if err := portListener.Close(); err != nil {
+			panic(commonlistener.FailedToCloseError)
+		}
+	}()
 
 	// Serve the gRPC server
 	if err = s.Serve(portListener); err != nil {
