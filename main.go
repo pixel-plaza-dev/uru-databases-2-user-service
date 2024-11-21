@@ -7,11 +7,9 @@ import (
 	commongcloud "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/cloud/gcloud"
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/flag"
-	commonjwt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt"
 	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
 	commonjwtvalidatorgrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator/grpc"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
-	commongrpc "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc"
 	clientauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/interceptor/auth"
 	serverauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/interceptor/auth"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
@@ -62,14 +60,14 @@ func main() {
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.PortKey)
 
 	// Get the MongoDB URI
-	mongoDbUri, err := commonmongodb.LoadMongoDBURI(mongodb.UriKey)
+	mongoDbUri, err := commonenv.LoadVariable(mongodb.UriKey)
 	if err != nil {
 		panic(err)
 	}
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.UriKey)
 
 	// Get the required MongoDB database name
-	mongoDbName, err := commonmongodb.LoadMongoDBName(mongodb.DbNameKey)
+	mongoDbName, err := commonenv.LoadVariable(mongodb.DbNameKey)
 	if err != nil {
 
 		panic(err)
@@ -79,7 +77,7 @@ func main() {
 	// Get the gRPC services URI
 	var uris = make(map[string]string)
 	for _, key := range []string{appgrpc.AuthServiceUriKey} {
-		uri, err := commongrpc.LoadServiceURI(key)
+		uri, err := commonenv.LoadVariable(key)
 		if err != nil {
 			panic(err)
 		}
@@ -88,7 +86,7 @@ func main() {
 	}
 
 	// Get the JWT public key
-	jwtPublicKey, err := commonjwt.LoadJwtKey(appjwt.PublicKey)
+	jwtPublicKey, err := commonenv.LoadVariable(appjwt.PublicKey)
 	if err != nil {
 		panic(err)
 	}
@@ -139,9 +137,9 @@ func main() {
 	defer func() {
 		// Disconnect from MongoDB
 		mongodbConnection.Disconnect()
-		logger.MongoDbLogger.DisconnectedFromMongoDB()
+		logger.MongoDbLogger.DisconnectedFromDatabase()
 	}()
-	logger.MongoDbLogger.ConnectedToMongoDB()
+	logger.MongoDbLogger.ConnectedToDatabase()
 
 	// Load transport credentials
 	var transportCredentials credentials.TransportCredentials
@@ -198,7 +196,7 @@ func main() {
 
 	// Create token validator
 	tokenValidator, err := commonjwtvalidatorgrpc.NewDefaultTokenValidator(
-		tokenSources[appgrpc.AuthServiceUriKey], &authClient,
+		tokenSources[appgrpc.AuthServiceUriKey], &authClient, nil,
 	)
 	if err != nil {
 		panic(err)
