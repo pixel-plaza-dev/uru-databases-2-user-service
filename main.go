@@ -12,6 +12,7 @@ import (
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	clientauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/interceptor/auth"
 	serverauth "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/interceptor/auth"
+	commongrpcvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/validator"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
 	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/tls"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
@@ -228,11 +229,18 @@ func main() {
 		),
 	)
 
+	// Create the gRPC server validator
+	serverValidator := commongrpcvalidator.NewDefaultValidator()
+
+	// Create the gRPC user server validator
+	userServerValidator := userserver.NewValidator(userDatabase, serverValidator)
+
 	// Create the gRPC user server
 	userServer := userserver.NewServer(
 		userDatabase,
 		authClient,
 		logger.UserServerLogger,
+		userServerValidator,
 	)
 
 	// Register the user server with the gRPC server

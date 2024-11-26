@@ -1,15 +1,17 @@
 package user
 
 import (
+	"errors"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
-	commonvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/validator"
-	commonvalidatorerror "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/validator/error"
+	commongrpcctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/context"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/validator"
+	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,6 +23,7 @@ type Server struct {
 	userDatabase *user.Database
 	authClient   pbauth.AuthClient
 	logger       Logger
+	validator    *Validator
 	protobuf.UnimplementedUserServer
 }
 
@@ -29,11 +32,13 @@ func NewServer(
 	userDatabase *user.Database,
 	authClient pbauth.AuthClient,
 	logger Logger,
+	validator *Validator,
 ) *Server {
 	return &Server{
 		userDatabase: userDatabase,
 		authClient:   authClient,
 		logger:       logger,
+		validator:    validator,
 	}
 }
 
@@ -42,90 +47,16 @@ func (s Server) SignUp(
 	ctx context.Context,
 	request *protobuf.SignUpRequest,
 ) (response *protobuf.SignUpResponse, err error) {
-	// Validation variables
-	validations := make(map[string][]error)
-	userExists := false
-
-	// Get the request fields
-	usernameField := "username"
-	emailField := "email"
-	birthDateField := "birth_date"
-
-	requestFieldsToValidate := map[string]string{
-		"Password":    "password",
-		"Email":       emailField,
-		"PhoneNumber": "phone_number",
-	}
-
-	profileFieldsToValidate := map[string]string{
-		"Username":  usernameField,
-		"FirstName": "first_name",
-		"LastName":  "last_name",
-	}
-
-	// Check if the required string fields are empty
-	commonvalidator.ValidNonEmptyStringFields(
-		&validations,
-		request,
-		&requestFieldsToValidate,
-	)
-	commonvalidator.ValidNonEmptyStringFields(
-		&validations,
-		request.GetProfile(),
-		&profileFieldsToValidate,
-	)
-
-	// Check if the user already exists
-	username := request.GetProfile().GetUsername()
-	if len(username) > 0 {
-		if _, err := s.userDatabase.FindUserByUsername(
-			username,
-			nil,
-		); err == nil {
-			userExists = true
-			validations[usernameField] = append(
-				validations[usernameField],
-				validator.UsernameTakenError,
-			)
-		}
-	}
-
-	// Check if the email is valid
-	email := request.GetEmail()
-	if len(email) > 0 {
-		if _, err = commonvalidator.ValidMailAddress(email); err != nil {
-			validations[emailField] = append(
-				validations[emailField],
-				commonvalidator.InvalidMailAddressError,
-			)
-		}
-	}
-
-	// Check if the birthdate is valid
-	birthDateTimestamp := request.GetProfile().GetBirthDate()
-	birthDate := birthDateTimestamp.AsTime()
-	currentTime := time.Now()
-	if birthDateTimestamp == nil || birthDate.After(currentTime) {
-		validations[birthDateField] = append(
-			validations[birthDateField],
-			validator.InvalidBirthDateError,
-		)
-	}
-
-	// Check if there are any validation errors
-	if len(validations) > 0 {
-		err = commonvalidatorerror.FailedValidationError{FieldsErrors: &validations}
-
-		if userExists {
-			return nil, status.Error(codes.AlreadyExists, err.Error())
-		}
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	// Validate the request
+	if err = s.validator.ValidateSignUpRequest(request); err != nil {
+		s.logger.SignUpFailed(err)
+		return nil, err
 	}
 
 	// Hash the password
 	hashedPassword, err := commonbcrypt.HashPassword(request.GetPassword())
 	if err != nil {
-		s.logger.FailedToHashPassword(err)
+		s.logger.HashPasswordFailed(err)
 		return nil, InternalServerError
 	}
 
@@ -133,19 +64,24 @@ func (s Server) SignUp(
 	userId := primitive.NewObjectID()
 	newUser := commonuser.User{
 		ID:             userId,
-		Username:       username,
-		FirstName:      request.GetProfile().GetFirstName(),
-		LastName:       request.GetProfile().GetLastName(),
+		Username:       request.GetUsername(),
+		FirstName:      request.GetFirstName(),
+		LastName:       request.GetLastName(),
 		HashedPassword: hashedPassword,
-		BirthDate:      birthDate,
+	}
+
+	// Add the birthdate if it exists
+	if request.GetBirthdate() != nil {
+		newUser.Birthdate = request.GetBirthdate().AsTime()
 	}
 
 	// Create the user email
+	currentTime := time.Now()
 	userEmailId := primitive.NewObjectID()
 	newUserEmail := commonuser.UserEmail{
 		ID:         userEmailId,
 		UserID:     userId,
-		Email:      email,
+		Email:      request.GetEmail(),
 		AssignedAt: currentTime,
 		IsActive:   true,
 	}
@@ -166,14 +102,14 @@ func (s Server) SignUp(
 		&newUserEmail,
 		&newUserPhoneNumber,
 	); err != nil {
+		s.logger.SignUpFailed(err)
 		return nil, InternalServerError
 	}
 
-	// Log the success
-	s.logger.UserSignedUp(userId.Hex())
+	// User signed up successfully
+	s.logger.SignedUp(userId.Hex())
 
 	return &protobuf.SignUpResponse{
-		Code:    uint32(codes.OK),
 		Message: SignUpSuccess,
 	}, nil
 }
@@ -181,27 +117,11 @@ func (s Server) SignUp(
 func (s Server) IsPasswordCorrect(
 	ctx context.Context,
 	request *protobuf.IsPasswordCorrectRequest,
-) (*protobuf.IsPasswordCorrectResponse, error) {
-	// Validation variables
-	validations := make(map[string][]error)
-
-	// Get the request fields
-	fieldsToValidate := map[string]string{
-		"Username": "username",
-		"Password": "password",
-	}
-
-	// Check if the required string fields are empty
-	commonvalidator.ValidNonEmptyStringFields(
-		&validations,
-		request,
-		&fieldsToValidate,
-	)
-
-	// Check if there are any validation errors
-	if len(validations) > 0 {
-		err := commonvalidatorerror.FailedValidationError{FieldsErrors: &validations}
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+) (response *protobuf.IsPasswordCorrectResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateIsPasswordCorrectRequest(request); err != nil {
+		s.logger.PasswordIsCorrectFailed(err)
+		return nil, err
 	}
 
 	// Validate the password and get the user ID
@@ -209,17 +129,131 @@ func (s Server) IsPasswordCorrect(
 		request.GetUsername(),
 		request.GetPassword(),
 	)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) && !errors.Is(err, mongodbuser.PasswordDoesNotMatchError) {
+		s.logger.PasswordIsCorrectFailed(err)
+		return nil, InternalServerError
+
 	}
 
-	// Log the password check success
-	s.logger.PasswordCheckSuccess(userIdentifier)
+	// Check if the password doesn't match or the user doesn't exist
+	if err != nil {
+		// User checked password unsuccessfully
+		s.logger.PasswordIsIncorrect(userIdentifier)
+
+		return nil, status.Error(codes.OK, IsPasswordCorrectFailure)
+	}
+
+	// User checked password successfully
+	s.logger.PasswordIsCorrect(userIdentifier)
 
 	return &protobuf.IsPasswordCorrectResponse{
-		Code:    uint32(codes.OK),
 		Message: IsPasswordCorrectSuccess,
 		UserId:  userIdentifier,
+	}, nil
+}
+
+// UsernameExists checks if the username exists
+func (s Server) UsernameExists(
+	ctx context.Context,
+	request *protobuf.UsernameExistsRequest,
+) (response *protobuf.UsernameExistsResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateUsernameExistsRequest(request); err != nil {
+		s.logger.UsernameExistsFailed(err)
+		return nil, err
+	}
+
+	// Check if the username exists
+	exists, err := s.userDatabase.UsernameExists(request.GetUsername())
+	if err != nil {
+		s.logger.UsernameExistsFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the username doesn't exist
+	if !exists {
+		// Username does not exist
+		s.logger.UserNotFoundByUsername(request.GetUsername())
+
+		return nil, status.Error(codes.NotFound, FoundByUsernameFailure)
+	}
+
+	// User found by username
+	s.logger.UserFoundByUsername(request.GetUsername())
+
+	return &protobuf.UsernameExistsResponse{
+		Message: FoundByUsernameSuccess,
+		Exists:  true,
+	}, nil
+}
+
+// GetUserIdByUsername gets the user's ID by username
+func (s Server) GetUserIdByUsername(
+	ctx context.Context,
+	request *protobuf.GetUserIdByUsernameRequest,
+) (response *protobuf.GetUserIdByUsernameResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateGetUserIdByUsernameRequest(request); err != nil {
+		s.logger.GetUserIdByUsernameFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID by username
+	userId, err := s.userDatabase.GetUserIdByUsername(request.GetUsername())
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.GetUserIdByUsernameFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the username doesn't exist
+	if userId == "" {
+		// Username does not exist
+		s.logger.UserNotFoundByUsername(request.GetUsername())
+
+		return nil, status.Error(codes.NotFound, FoundByUsernameFailure)
+	}
+
+	// User found by username
+	s.logger.UserFoundByUsername(request.GetUsername())
+
+	return &protobuf.GetUserIdByUsernameResponse{
+		Message: FoundByUsernameSuccess,
+		UserId:  userId,
+	}, nil
+}
+
+// GetUsernameByUserId gets the user's username by ID
+func (s Server) GetUsernameByUserId(
+	ctx context.Context,
+	request *protobuf.GetUsernameByUserIdRequest,
+) (response *protobuf.GetUsernameByUserIdResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateGetUsernameByUserIdRequest(request); err != nil {
+		s.logger.GetUsernameByUserIdFailed(err)
+		return nil, err
+	}
+
+	// Get the username by user ID
+	username, err := s.userDatabase.GetUsernameByUserId(request.GetUserId())
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.GetUsernameByUserIdFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the user ID doesn't exist
+	if username == "" {
+		// User ID does not exist
+		s.logger.UserNotFoundByUserId(request.GetUserId())
+
+		return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
+	}
+
+	// User found by user ID
+	s.logger.UserFoundByUsername(request.GetUserId())
+
+	return &protobuf.GetUsernameByUserIdResponse{
+		Message:  FoundByUserIdSuccess,
+		Username: username,
 	}, nil
 }
 
@@ -227,8 +261,55 @@ func (s Server) IsPasswordCorrect(
 func (s Server) UpdateProfile(
 	ctx context.Context,
 	request *protobuf.UpdateProfileRequest,
-) (*protobuf.UpdateProfileResponse, error) {
-	return nil, InDevelopmentError
+) (response *protobuf.UpdateProfileResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateUpdateProfileRequest(request); err != nil {
+		s.logger.UpdateProfileFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	subject, err := commongrpcctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Create the update fields BSON
+	var fieldsToSet bson.M
+	for key, value := range map[string]interface{}{
+		"first_name": request.GetFirstName(),
+		"last_name":  request.GetLastName(),
+		"birthdate":  request.GetBirthdate().AsTime(),
+	} {
+		// Skip empty values
+		if value != "" && value != nil {
+			fieldsToSet[key] = value
+		}
+	}
+	var updatedFields = bson.M{"$set": fieldsToSet}
+
+	// Update the user
+	_, err = s.userDatabase.UpdateUser(subject, &updatedFields)
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.UpdateProfileFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the user ID doesn't exist
+	if err != nil {
+		// User ID does not exist
+		s.logger.UserNotFoundByUserId(subject)
+
+		return nil, status.Error(codes.NotFound, UserUpdatedFailure)
+	}
+
+	// User found by user ID
+	s.logger.UpdateProfile(subject)
+
+	return &protobuf.UpdateProfileResponse{
+		Message: UserUpdatedSuccess,
+	}, nil
 }
 
 // GetProfile gets the user's profile
@@ -244,30 +325,6 @@ func (s Server) GetFullProfile(
 	ctx context.Context,
 	request *protobuf.GetFullProfileRequest,
 ) (*protobuf.GetFullProfileResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// GetUserIdByUsername gets the user's ID by username
-func (s Server) GetUserIdByUsername(
-	ctx context.Context,
-	request *protobuf.GetUserIdByUsernameRequest,
-) (*protobuf.GetUserIdByUsernameResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// UsernameExists checks if the username exists
-func (s Server) UsernameExists(
-	ctx context.Context,
-	request *protobuf.UsernameExistsRequest,
-) (*protobuf.UsernameExistsResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// GetUsernameByUserId gets the user's username by ID
-func (s Server) GetUsernameByUserId(
-	ctx context.Context,
-	request *protobuf.GetUsernameByUserIdRequest,
-) (*protobuf.GetUsernameByUserIdResponse, error) {
 	return nil, InDevelopmentError
 }
 

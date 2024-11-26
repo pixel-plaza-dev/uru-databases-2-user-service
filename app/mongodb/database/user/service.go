@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
@@ -88,9 +89,25 @@ func (d *Database) FindUser(filter bson.M, projection interface{}) (user *common
 
 // FindUserByUsername finds a user by username
 func (d *Database) FindUserByUsername(username string, projection interface{}) (user *commonuser.User, err error) {
-	// Create the filter
-	filter := bson.M{"username": username}
-	return d.FindUser(filter, projection)
+	// Check if the username is empty
+	if username == "" {
+		return nil, mongo.ErrNoDocuments
+	}
+
+	// Find the user
+	return d.FindUser(bson.M{"username": username}, projection)
+}
+
+// FindUserByUserId finds a user by the user ID
+func (d *Database) FindUserByUserId(userId string, projection interface{}) (user *commonuser.User, err error) {
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Find the user
+	return d.FindUser(bson.M{"_id": objectId}, projection)
 }
 
 // CreateUser creates a new user
@@ -169,11 +186,8 @@ func (d *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail
 
 // IsPasswordCorrect checks if the password is correct
 func (d *Database) IsPasswordCorrect(username string, hashedPassword string) (userId string, err error) {
-	// Create the projection
-	projection := bson.M{"_id": 1, "hashed_password": 1}
-
 	// Find the user
-	user, err := d.FindUserByUsername(username, projection)
+	user, err := d.FindUserByUsername(username, bson.M{"_id": 1, "hashed_password": 1})
 	if err != nil {
 		return "", PasswordDoesNotMatchError
 	}
@@ -183,6 +197,36 @@ func (d *Database) IsPasswordCorrect(username string, hashedPassword string) (us
 		return user.ID.Hex(), nil
 	}
 	return "", PasswordDoesNotMatchError
+}
+
+// UsernameExists checks if the username exists
+func (d *Database) UsernameExists(username string) (exists bool, err error) {
+	// Find the user
+	user, err := d.FindUserByUsername(username, bson.M{"_id": 1})
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		return false, err
+	}
+	return user != nil, nil
+}
+
+// GetUsernameByUserId gets the username by the user ID
+func (d *Database) GetUsernameByUserId(userId string) (username string, err error) {
+	// Find the user
+	user, err := d.FindUserByUserId(userId, bson.M{"username": 1})
+	if err != nil {
+		return "", err
+	}
+	return user.Username, nil
+}
+
+// GetUserIdByUsername gets the user ID by the username
+func (d *Database) GetUserIdByUsername(username string) (userId string, err error) {
+	// Find the user
+	user, err := d.FindUserByUsername(username, bson.M{"_id": 1})
+	if err != nil {
+		return "", err
+	}
+	return user.ID.Hex(), nil
 }
 
 // UpdateUserField updates a user field
@@ -217,19 +261,19 @@ func (d *Database) UpdateUserUsername(userId string, username string) (result *m
 }
 
 // UpdateUser updates a user
-func (d *Database) UpdateUser(user *commonuser.User) (result *mongo.UpdateResult, err error) {
-	// Create the filter
-	filter := bson.M{"_id": user.ID}
-
-	// Create the update
-	update := bson.M{"$set": user}
-
+func (d *Database) UpdateUser(userId string, updatedFields *bson.M) (result *mongo.UpdateResult, err error) {
 	// Create the context
 	ctx, cancelFunc := d.GetQueryContext()
 	defer cancelFunc()
 
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return nil, err
+	}
+
 	// Update the user
-	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, update)
+	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, bson.M{"_id": objectId}, *updatedFields)
 	if err != nil {
 		return nil, err
 	}
