@@ -20,6 +20,7 @@ import (
 	detailsuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/details/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
+	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
@@ -126,22 +127,6 @@ func main() {
 		panic(err)
 	}
 
-	// Create user database handler
-	userDatabase, err := userdatabase.NewDatabase(
-		mongodbClient,
-		mongoDbName,
-		logger.UserDatabaseLogger,
-	)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		// Disconnect from MongoDB
-		mongodbConnection.Disconnect()
-		logger.MongoDbLogger.DisconnectedFromDatabase()
-	}()
-	logger.MongoDbLogger.ConnectedToDatabase()
-
 	// Load transport credentials
 	var transportCredentials credentials.TransportCredentials
 
@@ -195,6 +180,23 @@ func main() {
 	// Create gRPC server clients
 	authClient := pbauth.NewAuthClient(conns[appgrpc.AuthServiceUriKey])
 
+	// Create user database handler
+	userDatabase, err := userdatabase.NewDatabase(
+		mongodbClient,
+		mongoDbName,
+		logger.UserDatabaseLogger,
+		authClient,
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		// Disconnect from MongoDB
+		mongodbConnection.Disconnect()
+		logger.MongoDbLogger.DisconnectedFromDatabase()
+	}()
+	logger.MongoDbLogger.ConnectedToDatabase()
+
 	// Create token validator
 	tokenValidator, err := commonjwtvalidatorgrpc.NewDefaultTokenValidator(
 		tokenSources[appgrpc.AuthServiceUriKey], &authClient, nil,
@@ -233,7 +235,7 @@ func main() {
 	serverValidator := commongrpcvalidator.NewDefaultValidator()
 
 	// Create the gRPC user server validator
-	userServerValidator := userserver.NewValidator(userDatabase, serverValidator)
+	userServerValidator := userservervalidator.NewValidator(userDatabase, serverValidator)
 
 	// Create the gRPC user server
 	userServer := userserver.NewServer(

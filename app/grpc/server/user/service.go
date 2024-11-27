@@ -4,10 +4,11 @@ import (
 	"errors"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
-	commongrpcctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/context"
+	commongrpcclientctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/context"
+	commongrpcserverctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/context"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
+	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,19 +21,19 @@ import (
 
 // Server is the gRPC user server
 type Server struct {
-	userDatabase *user.Database
+	userDatabase *mongodbuser.Database
 	authClient   pbauth.AuthClient
 	logger       Logger
-	validator    *Validator
+	validator    *userservervalidator.Validator
 	protobuf.UnimplementedUserServer
 }
 
 // NewServer creates a new gRPC user server
 func NewServer(
-	userDatabase *user.Database,
+	userDatabase *mongodbuser.Database,
 	authClient pbauth.AuthClient,
 	logger Logger,
-	validator *Validator,
+	validator *userservervalidator.Validator,
 ) *Server {
 	return &Server{
 		userDatabase: userDatabase,
@@ -83,7 +84,6 @@ func (s Server) SignUp(
 		UserID:     userId,
 		Email:      request.GetEmail(),
 		AssignedAt: currentTime,
-		IsActive:   true,
 	}
 
 	// Create the user phone number
@@ -93,11 +93,10 @@ func (s Server) SignUp(
 		UserID:      userId,
 		PhoneNumber: request.GetPhoneNumber(),
 		AssignedAt:  currentTime,
-		IsActive:    true,
 	}
 
 	// Insert the user into the user
-	if _, err = s.userDatabase.CreateUser(
+	if err = s.userDatabase.CreateUser(
 		&newUser,
 		&newUserEmail,
 		&newUserPhoneNumber,
@@ -124,31 +123,35 @@ func (s Server) IsPasswordCorrect(
 		return nil, err
 	}
 
-	// Validate the password and get the user ID
-	userIdentifier, err := s.userDatabase.IsPasswordCorrect(
-		request.GetUsername(),
-		request.GetPassword(),
+	// Get the user ID and hashed password by username
+	user, err := s.userDatabase.GetUserHashedPassword(
+		context.Background(), request.GetUsername(),
 	)
-	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) && !errors.Is(err, mongodbuser.PasswordDoesNotMatchError) {
+	if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
 		s.logger.PasswordIsCorrectFailed(err)
 		return nil, InternalServerError
-
 	}
 
+	// Check if the password matches
+	matches := commonbcrypt.CheckPasswordHash(user.HashedPassword, request.GetPassword())
+
+	// Get the user ID
+	userId := user.ID.Hex()
+
 	// Check if the password doesn't match or the user doesn't exist
-	if err != nil {
+	if err != nil || !matches {
 		// User checked password unsuccessfully
-		s.logger.PasswordIsIncorrect(userIdentifier)
+		s.logger.PasswordIsIncorrect(userId)
 
 		return nil, status.Error(codes.OK, IsPasswordCorrectFailure)
 	}
 
 	// User checked password successfully
-	s.logger.PasswordIsCorrect(userIdentifier)
+	s.logger.PasswordIsCorrect(userId)
 
 	return &protobuf.IsPasswordCorrectResponse{
 		Message: IsPasswordCorrectSuccess,
-		UserId:  userIdentifier,
+		UserId:  userId,
 	}, nil
 }
 
@@ -164,7 +167,7 @@ func (s Server) UsernameExists(
 	}
 
 	// Check if the username exists
-	exists, err := s.userDatabase.UsernameExists(request.GetUsername())
+	exists, err := s.userDatabase.UsernameExists(context.Background(), request.GetUsername())
 	if err != nil {
 		s.logger.UsernameExistsFailed(err)
 		return nil, InternalServerError
@@ -199,7 +202,7 @@ func (s Server) GetUserIdByUsername(
 	}
 
 	// Get the user ID by username
-	userId, err := s.userDatabase.GetUserIdByUsername(request.GetUsername())
+	userId, err := s.userDatabase.GetUserIdByUsername(context.Background(), request.GetUsername())
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 		s.logger.GetUserIdByUsernameFailed(err)
 		return nil, InternalServerError
@@ -234,7 +237,7 @@ func (s Server) GetUsernameByUserId(
 	}
 
 	// Get the username by user ID
-	username, err := s.userDatabase.GetUsernameByUserId(request.GetUserId())
+	username, err := s.userDatabase.GetUsernameByUserId(context.Background(), request.GetUserId())
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 		s.logger.GetUsernameByUserIdFailed(err)
 		return nil, InternalServerError
@@ -257,90 +260,287 @@ func (s Server) GetUsernameByUserId(
 	}, nil
 }
 
-// UpdateProfile updates the user's profile
-func (s Server) UpdateProfile(
+// GetProfile gets the user's profile
+func (s Server) GetProfile(
 	ctx context.Context,
-	request *protobuf.UpdateProfileRequest,
-) (response *protobuf.UpdateProfileResponse, err error) {
+	request *protobuf.GetProfileRequest,
+) (response *protobuf.GetProfileResponse, err error) {
 	// Validate the request
-	if err = s.validator.ValidateUpdateProfileRequest(request); err != nil {
-		s.logger.UpdateProfileFailed(err)
+	if err = s.validator.ValidateGetProfileRequest(request); err != nil {
+		s.logger.GetProfileFailed(err)
 		return nil, err
 	}
 
-	// Get the user ID from the access token
-	subject, err := commongrpcctx.GetCtxTokenClaimsSubject(ctx)
-	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
-		return nil, InternalServerError
-	}
-
-	// Create the update fields BSON
-	var fieldsToSet bson.M
-	for key, value := range map[string]interface{}{
-		"first_name": request.GetFirstName(),
-		"last_name":  request.GetLastName(),
-		"birthdate":  request.GetBirthdate().AsTime(),
-	} {
-		// Skip empty values
-		if value != "" && value != nil {
-			fieldsToSet[key] = value
-		}
-	}
-	var updatedFields = bson.M{"$set": fieldsToSet}
-
-	// Update the user
-	_, err = s.userDatabase.UpdateUser(subject, &updatedFields)
+	// Get the profile by user ID
+	profile, err := s.userDatabase.GetProfile(context.Background(), request.GetUserId())
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
-		s.logger.UpdateProfileFailed(err)
+		s.logger.GetProfileFailed(err)
 		return nil, InternalServerError
 	}
 
 	// Check if the user ID doesn't exist
 	if err != nil {
 		// User ID does not exist
-		s.logger.UserNotFoundByUserId(subject)
+		s.logger.UserNotFoundByUserId(request.GetUserId())
 
-		return nil, status.Error(codes.NotFound, UserUpdatedFailure)
+		return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
 	}
 
-	// User found by user ID
-	s.logger.UpdateProfile(subject)
+	// User profile found by user ID
+	s.logger.GetProfile(request.GetUserId())
 
-	return &protobuf.UpdateProfileResponse{
-		Message: UserUpdatedSuccess,
+	return &protobuf.GetProfileResponse{
+		Message:   GetProfileSuccess,
+		Username:  profile.Username,
+		FirstName: profile.FirstName,
+		LastName:  profile.LastName,
 	}, nil
 }
 
-// GetProfile gets the user's profile
-func (s Server) GetProfile(
+// UpdateUser updates the user
+func (s Server) UpdateUser(
 	ctx context.Context,
-	request *protobuf.GetProfileRequest,
-) (*protobuf.GetProfileResponse, error) {
-	return nil, InDevelopmentError
-}
+	request *protobuf.UpdateUserRequest,
+) (response *protobuf.UpdateUserResponse, err error) {
+	// Get the user ID from the access token
+	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
 
-// GetFullProfile gets the user's full profile
-func (s Server) GetFullProfile(
-	ctx context.Context,
-	request *protobuf.GetFullProfileRequest,
-) (*protobuf.GetFullProfileResponse, error) {
-	return nil, InDevelopmentError
+	// Create the update fields BSON
+	var update bson.M
+
+	// Iterate over the request string fields
+	for key, value := range map[string]interface{}{
+		"first_name": request.GetFirstName(),
+		"last_name":  request.GetLastName(),
+	} {
+		// Skip empty values
+		if value != "" {
+			update[key] = value
+		}
+	}
+
+	// Iterate over the request time fields
+	if request.GetBirthdate() != nil {
+		update["birthdate"] = request.GetBirthdate().AsTime()
+	}
+
+	// Update the user
+	_, err = s.userDatabase.UpdateUser(context.Background(), subject, &update)
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.UpdateUserFailed(err)
+		return nil, InternalServerError
+	}
+
+	// User found by user ID
+	s.logger.UpdateUser(subject)
+
+	return &protobuf.UpdateUserResponse{
+		Message: UpdatedSuccess,
+	}, nil
 }
 
 // ChangeUsername changes the user's username
 func (s Server) ChangeUsername(
 	ctx context.Context,
 	request *protobuf.ChangeUsernameRequest,
-) (*protobuf.ChangeUsernameResponse, error) {
-	return nil, InDevelopmentError
+) (response *protobuf.ChangeUsernameResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateChangeUsernameRequest(request); err != nil {
+		s.logger.GetProfileFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Update the user's username
+	err = s.userDatabase.UpdateUserUsername(subject, request.GetUsername())
+	if err != nil && !mongo.IsDuplicateKeyError(err) {
+		s.logger.UpdateUsernameFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the username already exists
+	if err != nil {
+		// Username exists
+		s.logger.UsernameExists(request.GetUsername())
+
+		return nil, status.Error(codes.AlreadyExists, UsernameExistsSuccess)
+	}
+
+	// Updated the user's username
+	s.logger.UpdateUsername(subject)
+
+	return &protobuf.ChangeUsernameResponse{
+		Message: ChangeUsernameSuccess,
+	}, nil
 }
 
 // ChangePassword changes the user's password
 func (s Server) ChangePassword(
 	ctx context.Context,
 	request *protobuf.ChangePasswordRequest,
-) (*protobuf.ChangePasswordResponse, error) {
+) (response *protobuf.ChangePasswordResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateChangePasswordRequest(request); err != nil {
+		s.logger.UpdatePasswordFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Check if the old password is correct
+	userHashedPassword, err := s.userDatabase.GetUserHashedPassword(context.Background(), subject)
+	if err != nil {
+		s.logger.PasswordIsCorrectFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the password matches
+	matches := commonbcrypt.CheckPasswordHash(userHashedPassword.HashedPassword, request.GetOldPassword())
+	if !matches {
+		s.logger.PasswordIsIncorrect(subject)
+		return nil, status.Error(codes.InvalidArgument, PasswordIsIncorrect)
+	}
+
+	// Get the user's hashed password
+	hashedNewPassword, err := commonbcrypt.HashPassword(request.GetNewPassword())
+	if err != nil {
+		s.logger.HashPasswordFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Get outgoing gRPC context
+	grpcCtx, err := commongrpcclientctx.GetOutgoingCtx(ctx)
+	if err != nil {
+		return nil, InternalServerError
+	}
+
+	// Update the user's password
+	err = s.userDatabase.UpdateUserPassword(grpcCtx, subject, hashedNewPassword)
+	if err != nil {
+		s.logger.UpdatePasswordFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Updated the user's password
+	s.logger.UpdatePassword(subject)
+
+	return &protobuf.ChangePasswordResponse{
+		Message: ChangePasswordSuccess,
+	}, nil
+}
+
+// GetPhoneNumber gets the user's phone number
+func (s Server) GetPhoneNumber(
+	ctx context.Context,
+	request *protobuf.GetPhoneNumberRequest,
+) (*protobuf.GetPhoneNumberResponse, error) {
+	// Get the user ID from the access token
+	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Get the current phone number by user ID
+	phoneNumber, err := s.userDatabase.GetUserPhoneNumber(context.Background(), subject)
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.GetPhoneNumberFailed(err)
+		return nil, InternalServerError
+	}
+
+	// User found by user ID
+	s.logger.GetPhoneNumber(subject)
+
+	return &protobuf.GetPhoneNumberResponse{
+		Message:     GetPhoneNumbersSuccess,
+		PhoneNumber: phoneNumber,
+	}, nil
+}
+
+// ChangePhoneNumber changes the user's phone number
+func (s Server) ChangePhoneNumber(
+	ctx context.Context,
+	request *protobuf.ChangePhoneNumberRequest,
+) (response *protobuf.ChangePhoneNumberResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateChangePhoneNumberRequest(request); err != nil {
+		s.logger.UpdatePhoneNumberFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Update the user's phone number
+	err = s.userDatabase.UpdateUserPhoneNumber(subject, request.GetPhoneNumber())
+	if err != nil {
+		s.logger.UpdatePhoneNumberFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Updated the user's phone number
+	s.logger.UpdatePhoneNumber(subject)
+
+	return &protobuf.ChangePhoneNumberResponse{
+		Message: ChangePhoneNumberSuccess,
+	}, nil
+}
+
+// GetMyProfile gets the user's profile
+func (s Server) GetMyProfile(
+	ctx context.Context,
+	request *protobuf.GetMyProfileRequest,
+) (response *protobuf.GetMyProfileResponse, err error) {
+	/*
+		// Get the user ID from the access token
+		subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+		if err != nil {
+			s.logger.MissingTokenClaimsSubject()
+			return nil, InternalServerError
+		}
+
+		// Get the full profile by user ID
+		username, err := s.userDatabase.GetFullProfile(subject)
+		if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+			s.logger.GetProfileFailed(err)
+			return nil, InternalServerError
+		}
+
+		// Check if the user ID doesn't exist
+		if username == "" {
+			// User ID does not exist
+			s.logger.UserNotFoundByUserId(request.GetUserId())
+
+			return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
+		}
+
+		// User found by user ID
+		s.logger.UserFoundByUsername(request.GetUserId())
+
+		return &protobuf.GetUsernameByUserIdResponse{
+			Message:  FoundByUserIdSuccess,
+			Username: username,
+		}, nil
+	*/
 	return nil, InDevelopmentError
 }
 
@@ -360,14 +560,6 @@ func (s Server) DeleteEmail(
 	return nil, InDevelopmentError
 }
 
-// SendVerificationEmail sends a verification email to the user
-func (s Server) SendVerificationEmail(
-	ctx context.Context,
-	request *protobuf.SendVerificationEmailRequest,
-) (*protobuf.SendVerificationEmailResponse, error) {
-	return nil, InDevelopmentError
-}
-
 // GetPrimaryEmail gets the user's primary email
 func (s Server) GetPrimaryEmail(
 	ctx context.Context,
@@ -384,14 +576,6 @@ func (s Server) ChangePrimaryEmail(
 	return nil, InDevelopmentError
 }
 
-// VerifyEmail verifies the user's email
-func (s Server) VerifyEmail(
-	ctx context.Context,
-	request *protobuf.VerifyEmailRequest,
-) (*protobuf.VerifyEmailResponse, error) {
-	return nil, InDevelopmentError
-}
-
 // GetActiveEmails gets the user's active emails
 func (s Server) GetActiveEmails(
 	ctx context.Context,
@@ -400,19 +584,29 @@ func (s Server) GetActiveEmails(
 	return nil, InDevelopmentError
 }
 
-// ChangePhoneNumber changes the user's phone number
-func (s Server) ChangePhoneNumber(
+// DeleteUser deletes the user's account
+func (s Server) DeleteUser(
 	ctx context.Context,
-	request *protobuf.ChangePhoneNumberRequest,
-) (*protobuf.ChangePhoneNumberResponse, error) {
+	request *protobuf.DeleteUserRequest,
+) (*protobuf.DeleteUserResponse, error) {
 	return nil, InDevelopmentError
 }
 
-// GetPhoneNumber gets the user's phone number
-func (s Server) GetPhoneNumber(
+// --- Requires more development ---
+
+// VerifyEmail verifies the user's email
+func (s Server) VerifyEmail(
 	ctx context.Context,
-	request *protobuf.GetPhoneNumberRequest,
-) (*protobuf.GetPhoneNumberResponse, error) {
+	request *protobuf.VerifyEmailRequest,
+) (*protobuf.VerifyEmailResponse, error) {
+	return nil, InDevelopmentError
+}
+
+// SendVerificationEmail sends a verification email to the user
+func (s Server) SendVerificationEmail(
+	ctx context.Context,
+	request *protobuf.SendVerificationEmailRequest,
+) (*protobuf.SendVerificationEmailResponse, error) {
 	return nil, InDevelopmentError
 }
 
@@ -445,13 +639,5 @@ func (s Server) ResetPassword(
 	ctx context.Context,
 	request *protobuf.ResetPasswordRequest,
 ) (*protobuf.ResetPasswordResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// DeleteUser deletes the user's account
-func (s Server) DeleteUser(
-	ctx context.Context,
-	request *protobuf.DeleteUserRequest,
-) (*protobuf.DeleteUserResponse, error) {
 	return nil, InDevelopmentError
 }

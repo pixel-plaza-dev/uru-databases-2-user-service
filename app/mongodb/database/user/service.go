@@ -3,15 +3,13 @@ package user
 import (
 	"context"
 	"errors"
-	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/writeconcern"
 	"time"
 )
 
@@ -20,10 +18,11 @@ type Database struct {
 	collections *map[string]*commonmongodb.Collection
 	client      *mongo.Client
 	logger      Logger
+	authClient  pbauth.AuthClient
 }
 
 // NewDatabase creates a new MongoDB user database handler
-func NewDatabase(client *mongo.Client, databaseName string, logger Logger) (database *Database, err error) {
+func NewDatabase(client *mongo.Client, databaseName string, logger Logger, authClient pbauth.AuthClient) (database *Database, err error) {
 	// Get the user service database
 	userServiceDb := client.Database(databaseName)
 
@@ -41,7 +40,8 @@ func NewDatabase(client *mongo.Client, databaseName string, logger Logger) (data
 	}
 
 	// Create the user database instance
-	instance := &Database{client: client, database: userServiceDb, collections: &collections, logger: logger}
+	instance := &Database{client: client, database: userServiceDb, collections: &collections, logger: logger,
+		authClient: authClient}
 
 	return instance, nil
 }
@@ -51,32 +51,85 @@ func (d *Database) Database() *mongo.Database {
 	return d.database
 }
 
-// GetQueryContext returns a new query context
-func (d *Database) GetQueryContext() (ctx context.Context, cancelFunc context.CancelFunc) {
-	return context.WithTimeout(context.Background(), mongodb.QueryCtxTimeout)
-}
-
-// GetTransactionContext returns a new transaction context
-func (d *Database) GetTransactionContext() (ctx context.Context, cancelFunc context.CancelFunc) {
-	return context.WithTimeout(context.Background(), mongodb.TransactionCtxTimeout)
-}
-
 // GetCollection returns a collection
 func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Collection {
 	return d.database.Collection(collection.Name)
 }
 
-// FindUser finds a user
-func (d *Database) FindUser(filter bson.M, projection interface{}) (user *commonuser.User, err error) {
-	// Create the context
-	ctx, cancelFunc := d.GetQueryContext()
-	defer cancelFunc()
+// CreateUserUsernameLogObject creates a new user username log object
+func (d *Database) CreateUserUsernameLogObject(userId primitive.ObjectID, username string) commonuser.UserUsernameLog {
+	return commonuser.UserUsernameLog{
+		ID:         primitive.NewObjectID(),
+		UserID:     userId,
+		Username:   username,
+		AssignedAt: time.Now(),
+	}
+}
 
-	// Create the find options
+// CreateUserHashedPasswordLogObject creates a new user hashed password log object
+func (d *Database) CreateUserHashedPasswordLogObject(userId primitive.ObjectID, hashedPassword string) commonuser.UserHashedPasswordLog {
+	return commonuser.UserHashedPasswordLog{
+		ID:             primitive.NewObjectID(),
+		UserID:         userId,
+		HashedPassword: hashedPassword,
+		AssignedAt:     time.Now(),
+	}
+}
+
+// CreateUser creates a new user
+func (d *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail, phoneNumber *commonuser.UserPhoneNumber) error {
+	// Create the UserHashedPasswordLog and UserUsernameLog objects
+	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(user.ID, user.HashedPassword)
+	userUsernameLog := d.CreateUserUsernameLogObject(user.ID, user.Username)
+
+	// Run the transaction
+	err := commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Create a new email for the user
+		if _, err := d.GetCollection(mongodb.UserEmailCollection).InsertOne(sc, email); err != nil {
+			return err
+		}
+
+		// Create a new phone number for the user
+		if _, err := d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(sc, phoneNumber); err != nil {
+			return err
+		}
+
+		// Create a new user
+		if _, err := d.GetCollection(mongodb.UserCollection).InsertOne(sc, user); err != nil {
+			return err
+		}
+
+		// Create a new user hashed password log
+		if _, err := d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(sc, userHashedPasswordLog); err != nil {
+			return err
+		}
+
+		// Create a new user username log
+		if _, err := d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(sc, userUsernameLog); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	// Check if there are any errors
+	if err != nil {
+		d.logger.FailedToCreateDocument(err)
+		return err
+	}
+
+	return nil
+}
+
+// FindUser finds a user
+func (d *Database) FindUser(ctx context.Context, filter interface{}, projection interface{}, sort interface{}) (user *commonuser.User, err error) {
+	// Set the default projection
 	if projection == nil {
 		projection = bson.M{"_id": 1}
 	}
-	findOptions := options.FindOne().SetProjection(projection)
+
+	// Create the find options
+	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
 
 	// Find the user
 	err = d.GetCollection(mongodb.UserCollection).FindOne(ctx, filter, findOptions).Decode(&user)
@@ -88,18 +141,23 @@ func (d *Database) FindUser(filter bson.M, projection interface{}) (user *common
 }
 
 // FindUserByUsername finds a user by username
-func (d *Database) FindUserByUsername(username string, projection interface{}) (user *commonuser.User, err error) {
+func (d *Database) FindUserByUsername(ctx context.Context, username string, projection interface{}, sort interface{}) (user *commonuser.User, err error) {
 	// Check if the username is empty
 	if username == "" {
 		return nil, mongo.ErrNoDocuments
 	}
 
 	// Find the user
-	return d.FindUser(bson.M{"username": username}, projection)
+	return d.FindUser(ctx, bson.M{"username": username}, projection, sort)
 }
 
 // FindUserByUserId finds a user by the user ID
-func (d *Database) FindUserByUserId(userId string, projection interface{}) (user *commonuser.User, err error) {
+func (d *Database) FindUserByUserId(ctx context.Context, userId string, projection interface{}, sort interface{}) (user *commonuser.User, err error) {
+	// Check if the user ID is empty
+	if userId == "" {
+		return nil, mongo.ErrNoDocuments
+	}
+
 	// Convert the user ID to an object ID
 	objectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
@@ -107,112 +165,24 @@ func (d *Database) FindUserByUserId(userId string, projection interface{}) (user
 	}
 
 	// Find the user
-	return d.FindUser(bson.M{"_id": objectId}, projection)
+	return d.FindUser(ctx, bson.M{"_id": *objectId}, projection, sort)
 }
 
-// CreateUser creates a new user
-func (d *Database) CreateUser(user *commonuser.User, email *commonuser.UserEmail, phoneNumber *commonuser.UserPhoneNumber) (result interface{}, err error) {
-	// Create the transaction options
-	wc := writeconcern.Majority()
-	txnOptions := options.Transaction().SetWriteConcern(wc)
-
-	// Create the context
-	ctx, cancelFunc := d.GetTransactionContext()
-	defer cancelFunc()
-
-	// Starts a session on the client
-	session, err := d.client.StartSession()
-	if err != nil {
-		panic(err)
-	}
-	defer session.EndSession(ctx)
-
-	// Create the UserHashedPasswordLog
-	currentTime := time.Now()
-	userHashedPasswordLog := commonuser.UserHashedPasswordLog{
-		ID:             primitive.NewObjectID(),
-		UserID:         user.ID,
-		HashedPassword: user.HashedPassword,
-		AssignedAt:     currentTime,
+// GetUserHashedPassword gets the user's hashed password
+func (d *Database) GetUserHashedPassword(ctx context.Context, username string) (user *commonuser.User, err error) {
+	// Check if the username is empty
+	if username == "" {
+		return nil, mongo.ErrNoDocuments
 	}
 
-	// Create the UserUsernameLog
-	userUsernameLog := commonuser.UserUsernameLog{
-		ID:         primitive.NewObjectID(),
-		UserID:     user.ID,
-		Username:   user.Username,
-		AssignedAt: currentTime,
-	}
-
-	// Run the transaction
-	result, err = session.WithTransaction(ctx, func(ctx mongo.SessionContext) (interface{}, error) {
-		// Create a new email for the user
-		if _, err = d.GetCollection(mongodb.UserEmailCollection).InsertOne(ctx, email); err != nil {
-			return nil, err
-		}
-
-		// Create a new phone number for the user
-		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(ctx, phoneNumber); err != nil {
-			return nil, err
-		}
-
-		// Create a new user
-		userResult, err := d.GetCollection(mongodb.UserCollection).InsertOne(ctx, user)
-		if err != nil {
-			return nil, err
-		}
-
-		// Create a new user hashed password log
-		if _, err = d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(ctx, userHashedPasswordLog); err != nil {
-			return nil, err
-		}
-
-		// Create a new user username log
-		if _, err = d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(ctx, userUsernameLog); err != nil {
-			return nil, err
-		}
-
-		return userResult, nil
-	}, txnOptions)
-
-	// Check if there are any errors
-	if err != nil {
-		d.logger.FailedToCreateDocument(err)
-		return nil, err
-	}
-
-	return result, nil
-}
-
-// IsPasswordCorrect checks if the password is correct
-func (d *Database) IsPasswordCorrect(username string, hashedPassword string) (userId string, err error) {
 	// Find the user
-	user, err := d.FindUserByUsername(username, bson.M{"_id": 1, "hashed_password": 1})
-	if err != nil {
-		return "", PasswordDoesNotMatchError
-	}
-
-	// Check if the password is correct
-	if commonbcrypt.CheckPasswordHash(hashedPassword, user.HashedPassword) {
-		return user.ID.Hex(), nil
-	}
-	return "", PasswordDoesNotMatchError
-}
-
-// UsernameExists checks if the username exists
-func (d *Database) UsernameExists(username string) (exists bool, err error) {
-	// Find the user
-	user, err := d.FindUserByUsername(username, bson.M{"_id": 1})
-	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
-		return false, err
-	}
-	return user != nil, nil
+	return d.FindUserByUsername(ctx, username, bson.M{"_id": 1, "hashed_password": 1}, nil)
 }
 
 // GetUsernameByUserId gets the username by the user ID
-func (d *Database) GetUsernameByUserId(userId string) (username string, err error) {
+func (d *Database) GetUsernameByUserId(ctx context.Context, userId string) (username string, err error) {
 	// Find the user
-	user, err := d.FindUserByUserId(userId, bson.M{"username": 1})
+	user, err := d.FindUserByUserId(ctx, userId, bson.M{"username": 1}, nil)
 	if err != nil {
 		return "", err
 	}
@@ -220,63 +190,178 @@ func (d *Database) GetUsernameByUserId(userId string) (username string, err erro
 }
 
 // GetUserIdByUsername gets the user ID by the username
-func (d *Database) GetUserIdByUsername(username string) (userId string, err error) {
+func (d *Database) GetUserIdByUsername(ctx context.Context, username string) (userId string, err error) {
 	// Find the user
-	user, err := d.FindUserByUsername(username, bson.M{"_id": 1})
+	user, err := d.FindUserByUsername(ctx, username, bson.M{"_id": 1}, nil)
 	if err != nil {
 		return "", err
 	}
 	return user.ID.Hex(), nil
 }
 
-// UpdateUserField updates a user field
-func (d *Database) UpdateUserField(userId string, field string, value interface{}) (result *mongo.UpdateResult, err error) {
-	// Create the filter
-	filter := bson.M{"_id": userId}
-
-	// Create the update
-	update := bson.M{"$set": bson.M{field: value}}
-
-	// Create the context
-	ctx, cancelFunc := d.GetQueryContext()
-	defer cancelFunc()
-
-	// Update the user
-	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, update)
-	if err != nil {
-		return nil, err
+// UsernameExists checks if the username exists
+func (d *Database) UsernameExists(ctx context.Context, username string) (exists bool, err error) {
+	// Find the user
+	user, err := d.FindUserByUsername(ctx, username, bson.M{"_id": 1}, nil)
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		return false, err
 	}
-
-	return result, nil
-}
-
-// UpdateUserPassword updates a user password
-func (d *Database) UpdateUserPassword(userId string, hashedPassword string) (result *mongo.UpdateResult, err error) {
-	return d.UpdateUserField(userId, "hashed_password", hashedPassword)
-}
-
-// UpdateUserUsername updates a user username
-func (d *Database) UpdateUserUsername(userId string, username string) (result *mongo.UpdateResult, err error) {
-	return d.UpdateUserField(userId, "username", username)
+	return user != nil, nil
 }
 
 // UpdateUser updates a user
-func (d *Database) UpdateUser(userId string, updatedFields *bson.M) (result *mongo.UpdateResult, err error) {
-	// Create the context
-	ctx, cancelFunc := d.GetQueryContext()
-	defer cancelFunc()
-
+func (d *Database) UpdateUser(ctx context.Context, userId string, update interface{}) (result *mongo.UpdateResult, err error) {
 	// Convert the user ID to an object ID
 	objectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return nil, err
 	}
 
+	// Create the filter
+	filter := bson.M{"_id": *objectId}
+
 	// Update the user
-	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, bson.M{"_id": objectId}, *updatedFields)
+	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, bson.M{"$set": update})
 	if err != nil {
 		return nil, err
 	}
 
 	return result, nil
+}
+
+// UpdateUserUsername updates the user username
+func (d *Database) UpdateUserUsername(userId string, username string) error {
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return err
+	}
+
+	// Create the UserUsernameLog object
+	userUsernameLog := d.CreateUserUsernameLogObject(*objectId, username)
+
+	// Run the transaction
+	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Update the user username
+		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *objectId}, bson.M{"username": username}); err != nil {
+			return err
+		}
+
+		// Create a new user username log
+		if _, err = d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(sc, userUsernameLog); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	return err
+}
+
+// UpdateUserPassword updates the user password
+func (d *Database) UpdateUserPassword(grpcCtx context.Context, userId string, hashedPassword string) error {
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return err
+	}
+
+	// Create the UserHashedPasswordLog object
+	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(*objectId, hashedPassword)
+
+	// Run the transaction
+	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Update the user password
+		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *objectId}, bson.M{"hashed_password": hashedPassword}); err != nil {
+			return err
+		}
+
+		// Create a new user hashed password log
+		if _, err = d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(sc, userHashedPasswordLog); err != nil {
+			return err
+		}
+
+		// Close all user sessions
+		_, err = d.authClient.CloseSessions(grpcCtx, &pbauth.CloseSessionsRequest{})
+
+		return nil
+	})
+	return err
+}
+
+// UpdateProfile updates a user
+func (d *Database) UpdateProfile(ctx context.Context, userId string, update interface{}) (result *mongo.UpdateResult, err error) {
+	return d.UpdateUser(ctx, userId, update)
+}
+
+// GetProfile gets the user's profile
+func (d *Database) GetProfile(ctx context.Context, userId string) (user *commonuser.User, err error) {
+	return d.FindUserByUserId(ctx, userId, bson.M{"username": 1, "first_name": 1, "last_name": 1}, nil)
+}
+
+// FindUserPhoneNumber finds a user's phone number
+func (d *Database) FindUserPhoneNumber(ctx context.Context, filter interface{}, projection interface{}, sort interface{}) (phoneNumber *commonuser.UserPhoneNumber, err error) {
+	// Create the find options
+	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
+
+	// Find the user's phone number
+	err = d.GetCollection(mongodb.UserPhoneNumberCollection).FindOne(ctx, filter, findOptions).Decode(phoneNumber)
+	if err != nil {
+		return nil, err
+	}
+	return phoneNumber, nil
+}
+
+// GetUserPhoneNumber gets the user's phone number
+func (d *Database) GetUserPhoneNumber(ctx context.Context, userId string) (phoneNumber string, err error) {
+	// Check if the user ID is empty
+	if userId == "" {
+		return "", mongo.ErrNoDocuments
+	}
+
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return "", err
+	}
+
+	// Create the find options with the most recent document based on the given field
+	sort := bson.M{"assigned_at": -1}
+
+	// Find the user's phone number
+	var userPhoneNumber *commonuser.UserPhoneNumber
+	userPhoneNumber, err = d.FindUserPhoneNumber(ctx, bson.M{"user_id": objectId}, bson.M{"phone_number": 1}, sort)
+	if err != nil {
+		return "", err
+	}
+	return userPhoneNumber.PhoneNumber, nil
+}
+
+// UpdateUserPhoneNumber updates the user's phone number
+func (d *Database) UpdateUserPhoneNumber(userId string, phoneNumber string) error {
+	// Convert the user ID to an object ID
+	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return err
+	}
+
+	// Run the transaction
+	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Revoke the user's phone number
+		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).UpdateOne(sc, bson.M{"user_id": *objectId, "revoked_at": bson.M{"$exists": false}}, bson.M{"revoked_at": time.Now()}); err != nil {
+			return err
+		}
+
+		// Update the user's phone number
+		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(sc, commonuser.UserPhoneNumber{
+			ID:          primitive.NewObjectID(),
+			UserID:      *objectId,
+			PhoneNumber: phoneNumber,
+			AssignedAt:  time.Now(),
+		}); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	return err
 }

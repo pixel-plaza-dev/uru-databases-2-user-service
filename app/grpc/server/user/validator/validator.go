@@ -1,32 +1,32 @@
-package user
+package validator
 
 import (
+	"context"
 	commongrpcvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/validator"
 	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/validator"
+	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc/codes"
 )
 
 type (
 	// Validator is the default validator for the user service gRPC methods
 	Validator struct {
-		userDatabase *user.Database
+		userDatabase *mongodbuser.Database
 		validator    commongrpcvalidator.Validator
 	}
 )
 
 // NewValidator creates a new validator
-func NewValidator(userDatabase *user.Database, validator commongrpcvalidator.Validator) *Validator {
+func NewValidator(userDatabase *mongodbuser.Database, validator commongrpcvalidator.Validator) *Validator {
 	return &Validator{userDatabase: userDatabase, validator: validator}
 }
 
 // UsernameExists checks if the username exists
 func (d Validator) UsernameExists(usernameField string, username string, validations *map[string][]error) bool {
-	if exists, _ := d.userDatabase.UsernameExists(username); exists {
+	if exists, _ := d.userDatabase.UsernameExists(context.Background(), username); exists {
 		(*validations)[usernameField] = append(
 			(*validations)[usernameField],
-			validator.UsernameTakenError,
+			UsernameTakenError,
 		)
 		return true
 	}
@@ -121,18 +121,56 @@ func (d Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernam
 	return d.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
-// ValidateUpdateProfileRequest validates the update profile request
-func (d Validator) ValidateUpdateProfileRequest(request *pbuser.UpdateProfileRequest) error {
-	// Create the validations map
-	validations := &map[string][]error{}
+// ValidateGetProfileRequest validates the get profile request
+func (d Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"UserId": "user_id",
+		})
 
-	// Get the request fields
-	birthdateField := "birthdate"
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
 
-	// Check if the birthdate is valid
-	if birthdate := request.GetBirthdate(); birthdate != nil {
-		d.validator.ValidateBirthdate(birthdateField, birthdate, validations)
+// ValidateChangeUsernameRequest validates the change username request
+func (d Validator) ValidateChangeUsernameRequest(request *pbuser.ChangeUsernameRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"Username": "username",
+		})
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateChangePasswordRequest validates the change password request
+func (d Validator) ValidateChangePasswordRequest(request *pbuser.ChangePasswordRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"OldPassword": "old_password",
+			"NewPassword": "new_password",
+		})
+
+	// Check if the new password is different from the old password
+	if request.GetOldPassword() == request.GetNewPassword() {
+		(*validations)["new_password"] = append((*validations)["new_password"], NewPasswordSameAsOldError)
 	}
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateChangePhoneNumberRequest validates the change phone number request
+func (d Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneNumberRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"PhoneNumber": "phone_number",
+		})
 
 	return d.validator.CheckValidations(validations, codes.InvalidArgument)
 }
