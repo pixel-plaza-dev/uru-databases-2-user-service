@@ -226,6 +226,21 @@ func (d Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) erro
 	return d.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
+// ValidateChangePrimaryEmailRequest validates the change primary email request
+func (d Validator) ValidateChangePrimaryEmailRequest(request *pbuser.ChangePrimaryEmailRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"Email": "email",
+		})
+
+	// Check if the email is valid
+	d.validator.ValidateEmail("email", request.GetEmail(), validations)
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
 // ValidateDeleteEmailRequest validates the delete email request
 func (d Validator) ValidateDeleteEmailRequest(request *pbuser.DeleteEmailRequest) error {
 	// Get validations from fields to validate

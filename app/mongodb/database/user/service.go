@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
@@ -56,45 +57,92 @@ func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Co
 }
 
 // CreateUserUsernameLogObject creates a new user username log object
-func (d *Database) CreateUserUsernameLogObject(userId primitive.ObjectID, username string) commonuser.UserUsernameLog {
+func (d *Database) CreateUserUsernameLogObject(userId *primitive.ObjectID, username string) commonuser.UserUsernameLog {
 	return commonuser.UserUsernameLog{
 		ID:         primitive.NewObjectID(),
-		UserID:     userId,
+		UserID:     *userId,
 		Username:   username,
 		AssignedAt: time.Now(),
 	}
 }
 
 // CreateUserHashedPasswordLogObject creates a new user hashed password log object
-func (d *Database) CreateUserHashedPasswordLogObject(userId primitive.ObjectID, hashedPassword string) commonuser.UserHashedPasswordLog {
+func (d *Database) CreateUserHashedPasswordLogObject(userId *primitive.ObjectID, hashedPassword string) commonuser.UserHashedPasswordLog {
 	return commonuser.UserHashedPasswordLog{
 		ID:             primitive.NewObjectID(),
-		UserID:         userId,
+		UserID:         *userId,
 		HashedPassword: hashedPassword,
 		AssignedAt:     time.Now(),
 	}
 }
 
-// CreateUser creates a new user
-func (d *Database) CreateUser(user *commonuser.User, userSharedIdentifier *commonuser.UserSharedIdentifier, userEmail *commonuser.UserEmail, userPhoneNumber *commonuser.UserPhoneNumber) error {
-	// Create the UserHashedPasswordLog and UserUsernameLog objects
-	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(user.ID, user.HashedPassword)
-	userUsernameLog := d.CreateUserUsernameLogObject(user.ID, user.Username)
+// CreateUserSharedIdentifierObject creates a new user shared identifier object
+func (d *Database) CreateUserSharedIdentifierObject(userId *primitive.ObjectID) commonuser.UserSharedIdentifier {
+	return commonuser.UserSharedIdentifier{
+		ID:     primitive.NewObjectID(),
+		UserID: *userId,
+		UUID:   uuid.New().String(),
+	}
+}
 
+// CreateUserHashedPasswordLog creates a new user hashed password log
+func (d *Database) CreateUserHashedPasswordLog(ctx context.Context, userId *primitive.ObjectID, hashedPassword string) error {
+	// Create the UserHashedPasswordLog object
+	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(userId, hashedPassword)
+
+	// Create a new user hashed password log
+	_, err := d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(ctx, userHashedPasswordLog)
+	return err
+}
+
+// CreateUserUsernameLog creates a new user username log
+func (d *Database) CreateUserUsernameLog(ctx context.Context, userId *primitive.ObjectID, username string) error {
+	// Create the UserUsernameLog object
+	userUsernameLog := d.CreateUserUsernameLogObject(userId, username)
+
+	// Create a new user username log
+	_, err := d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(ctx, userUsernameLog)
+	return err
+}
+
+// CreateUserSharedIdentifier creates a new user shared identifier
+func (d *Database) CreateUserSharedIdentifier(ctx context.Context, userId *primitive.ObjectID) error {
+	// Create the UserSharedIdentifier object
+	userSharedId := d.CreateUserSharedIdentifierObject(userId)
+
+	// Create a new user shared identifier
+	_, err := d.GetCollection(mongodb.UserSharedIdentifierCollection).InsertOne(ctx, userSharedId)
+	return err
+}
+
+// CreateUserEmail creates a new user email
+func (d *Database) CreateUserEmail(ctx context.Context, userEmail *commonuser.UserEmail) error {
+	_, err := d.GetCollection(mongodb.UserEmailCollection).InsertOne(ctx, userEmail)
+	return err
+}
+
+// CreateUserPhoneNumber creates a new user phone number
+func (d *Database) CreateUserPhoneNumber(ctx context.Context, userPhoneNumber *commonuser.UserPhoneNumber) error {
+	_, err := d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(ctx, userPhoneNumber)
+	return err
+}
+
+// CreateUser creates a new user
+func (d *Database) CreateUser(user *commonuser.User, userEmail *commonuser.UserEmail, userPhoneNumber *commonuser.UserPhoneNumber) error {
 	// Run the transaction
 	err := commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Create a new email for the user
-		if _, err := d.GetCollection(mongodb.UserEmailCollection).InsertOne(sc, userEmail); err != nil {
+		if err := d.CreateUserEmail(sc, userEmail); err != nil {
 			return err
 		}
 
 		// Create a new phone number for the user
-		if _, err := d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(sc, userPhoneNumber); err != nil {
+		if err := d.CreateUserPhoneNumber(sc, userPhoneNumber); err != nil {
 			return err
 		}
 
 		// Create a new shared identifier for the user
-		if _, err := d.GetCollection(mongodb.UserSharedIdentifierCollection).InsertOne(sc, userSharedIdentifier); err != nil {
+		if err := d.CreateUserSharedIdentifier(sc, &user.ID); err != nil {
 			return err
 		}
 
@@ -104,12 +152,12 @@ func (d *Database) CreateUser(user *commonuser.User, userSharedIdentifier *commo
 		}
 
 		// Create a new user hashed password log
-		if _, err := d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(sc, userHashedPasswordLog); err != nil {
+		if err := d.CreateUserHashedPasswordLog(sc, &user.ID, user.HashedPassword); err != nil {
 			return err
 		}
 
 		// Create a new user username log
-		_, err := d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(sc, userUsernameLog)
+		err := d.CreateUserUsernameLog(sc, &user.ID, user.Username)
 		return err
 	})
 	return err
@@ -156,13 +204,13 @@ func (d *Database) FindUserByUserId(ctx context.Context, userId string, projecti
 	}
 
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return nil, err
 	}
 
 	// Find the user
-	return d.FindUser(ctx, bson.M{"_id": *objectId}, projection, sort)
+	return d.FindUser(ctx, bson.M{"_id": *userObjectId}, projection, sort)
 }
 
 // GetUserHashedPassword gets the user's hashed password
@@ -209,13 +257,13 @@ func (d *Database) UsernameExists(ctx context.Context, username string) (exists 
 // UpdateUser updates a user
 func (d *Database) UpdateUser(ctx context.Context, userId string, update interface{}) (result *mongo.UpdateResult, err error) {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return nil, err
 	}
 
 	// Create the filter
-	filter := bson.M{"_id": *objectId}
+	filter := bson.M{"_id": *userObjectId}
 
 	// Update the user
 	result, err = d.GetCollection(mongodb.UserCollection).UpdateOne(ctx, filter, bson.M{"$set": update})
@@ -229,23 +277,20 @@ func (d *Database) UpdateUser(ctx context.Context, userId string, update interfa
 // UpdateUserUsername updates the user username
 func (d *Database) UpdateUserUsername(userId string, username string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
 
-	// Create the UserUsernameLog object
-	userUsernameLog := d.CreateUserUsernameLogObject(*objectId, username)
-
 	// Run the transaction
 	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Update the user username
-		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *objectId}, bson.M{"username": username}); err != nil {
+		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *userObjectId}, bson.M{"username": username}); err != nil {
 			return err
 		}
 
 		// Create a new user username log
-		_, err = d.GetCollection(mongodb.UserUsernameLogCollection).InsertOne(sc, userUsernameLog)
+		err = d.CreateUserUsernameLog(sc, userObjectId, username)
 		return err
 	})
 	return err
@@ -254,23 +299,20 @@ func (d *Database) UpdateUserUsername(userId string, username string) error {
 // UpdateUserPassword updates the user password
 func (d *Database) UpdateUserPassword(grpcCtx context.Context, userId string, hashedPassword string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
 
-	// Create the UserHashedPasswordLog object
-	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(*objectId, hashedPassword)
-
 	// Run the transaction
 	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Update the user password
-		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *objectId}, bson.M{"hashed_password": hashedPassword}); err != nil {
+		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *userObjectId}, bson.M{"hashed_password": hashedPassword}); err != nil {
 			return err
 		}
 
 		// Create a new user hashed password log
-		if _, err = d.GetCollection(mongodb.UserHashedPasswordLogCollection).InsertOne(sc, userHashedPasswordLog); err != nil {
+		if err = d.CreateUserHashedPasswordLog(sc, userObjectId, hashedPassword); err != nil {
 			return err
 		}
 
@@ -282,14 +324,14 @@ func (d *Database) UpdateUserPassword(grpcCtx context.Context, userId string, ha
 	return err
 }
 
-// UpdateProfile updates a user
-func (d *Database) UpdateProfile(ctx context.Context, userId string, update interface{}) (result *mongo.UpdateResult, err error) {
+// UpdateUserProfile updates a user
+func (d *Database) UpdateUserProfile(ctx context.Context, userId string, update interface{}) (result *mongo.UpdateResult, err error) {
 	return d.UpdateUser(ctx, userId, update)
 }
 
-// GetProfile gets the user's profile
-func (d *Database) GetProfile(ctx context.Context, userId string) (user *commonuser.User, err error) {
-	return d.FindUserByUserId(ctx, userId, bson.M{"username": 1, "first_name": 1, "last_name": 1}, nil)
+// GetUserProfile gets the user's profile
+func (d *Database) GetUserProfile(ctx context.Context, userId string) (user *commonuser.User, err error) {
+	return d.FindUserByUserId(ctx, userId, bson.M{"username": 1, "first_name": 1, "last_name": 1, "birthdate": 1}, nil)
 }
 
 // FindUserSharedIdentifier finds a user's shared identifier
@@ -313,14 +355,14 @@ func (d *Database) FindUserSharedIdentifier(ctx context.Context, filter interfac
 // GetUserSharedIdByUserId gets the user's shared identifier by the user ID
 func (d *Database) GetUserSharedIdByUserId(ctx context.Context, userId string) (userSharedId string, err error) {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return "", err
 	}
 
 	// Find the user's shared identifier
 	var userSharedIdentifier *commonuser.UserSharedIdentifier
-	userSharedIdentifier, err = d.FindUserSharedIdentifier(ctx, bson.M{"user_id": *objectId}, bson.M{"uuid": 1}, nil)
+	userSharedIdentifier, err = d.FindUserSharedIdentifier(ctx, bson.M{"user_id": *userObjectId}, bson.M{"uuid": 1}, nil)
 	if err != nil {
 		return "", err
 	}
@@ -363,7 +405,7 @@ func (d *Database) GetUserPhoneNumber(ctx context.Context, userId string) (phone
 	}
 
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return "", err
 	}
@@ -373,7 +415,7 @@ func (d *Database) GetUserPhoneNumber(ctx context.Context, userId string) (phone
 
 	// Find the user's phone number
 	var userPhoneNumber *commonuser.UserPhoneNumber
-	userPhoneNumber, err = d.FindUserPhoneNumber(ctx, bson.M{"user_id": objectId}, bson.M{"phone_number": 1}, sort)
+	userPhoneNumber, err = d.FindUserPhoneNumber(ctx, bson.M{"user_id": userObjectId}, bson.M{"phone_number": 1}, sort)
 	if err != nil {
 		return "", err
 	}
@@ -383,7 +425,7 @@ func (d *Database) GetUserPhoneNumber(ctx context.Context, userId string) (phone
 // UpdateUserPhoneNumber updates the user's phone number
 func (d *Database) UpdateUserPhoneNumber(userId string, phoneNumber string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
@@ -391,14 +433,14 @@ func (d *Database) UpdateUserPhoneNumber(userId string, phoneNumber string) erro
 	// Run the transaction
 	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Revoke the user's phone number
-		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).UpdateOne(sc, bson.M{"user_id": *objectId, "revoked_at": bson.M{"$exists": false}}, bson.M{"revoked_at": time.Now()}); err != nil {
+		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).UpdateOne(sc, bson.M{"user_id": *userObjectId, "revoked_at": bson.M{"$exists": false}}, bson.M{"revoked_at": time.Now()}); err != nil {
 			return err
 		}
 
 		// Update the user's phone number
-		if _, err = d.GetCollection(mongodb.UserPhoneNumberCollection).InsertOne(sc, commonuser.UserPhoneNumber{
+		if err = d.CreateUserPhoneNumber(sc, &commonuser.UserPhoneNumber{
 			ID:          primitive.NewObjectID(),
-			UserID:      *objectId,
+			UserID:      *userObjectId,
 			PhoneNumber: phoneNumber,
 			AssignedAt:  time.Now(),
 		}); err != nil {
@@ -413,7 +455,7 @@ func (d *Database) UpdateUserPhoneNumber(userId string, phoneNumber string) erro
 // DeleteUser deletes a user
 func (d *Database) DeleteUser(grpcCtx context.Context, userId string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
@@ -421,7 +463,7 @@ func (d *Database) DeleteUser(grpcCtx context.Context, userId string) error {
 	// Run the transaction
 	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Update the user deleted at field
-		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *objectId}, bson.M{"deleted_at": time.Now()}); err != nil {
+		if _, err = d.GetCollection(mongodb.UserCollection).UpdateOne(sc, bson.M{"_id": *userObjectId}, bson.M{"deleted_at": time.Now()}); err != nil {
 			return err
 		}
 
@@ -433,10 +475,10 @@ func (d *Database) DeleteUser(grpcCtx context.Context, userId string) error {
 	return err
 }
 
-// AddEmail adds an email to a user
-func (d *Database) AddEmail(ctx context.Context, userId string, email string) error {
+// AddUserEmail adds an email to a user
+func (d *Database) AddUserEmail(ctx context.Context, userId string, email string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
@@ -444,15 +486,15 @@ func (d *Database) AddEmail(ctx context.Context, userId string, email string) er
 	// Run the transaction
 	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
 		// Check if the user email already exists
-		_, err = d.FindUserEmail(ctx, bson.M{"user_id": *objectId, "email": email, "revoked_at": bson.M{"$exists": false}}, bson.M{"_id": 1}, nil)
+		_, err = d.FindUserEmail(ctx, bson.M{"user_id": *userObjectId, "email": email, "revoked_at": bson.M{"$exists": false}}, bson.M{"_id": 1}, nil)
 		if err == nil || !errors.Is(mongo.ErrNoDocuments, err) {
 			return EmailAlreadyExistsError
 		}
 
 		// Add the email to the user
-		_, err = d.GetCollection(mongodb.UserEmailCollection).InsertOne(ctx, commonuser.UserEmail{
+		err = d.CreateUserEmail(ctx, &commonuser.UserEmail{
 			ID:         primitive.NewObjectID(),
-			UserID:     *objectId,
+			UserID:     *userObjectId,
 			Email:      email,
 			AssignedAt: time.Now(),
 		})
@@ -462,16 +504,41 @@ func (d *Database) AddEmail(ctx context.Context, userId string, email string) er
 	return err
 }
 
-// DeleteEmail deletes an email from a user
-func (d *Database) DeleteEmail(ctx context.Context, userId string, email string) error {
+// UpdateUserPrimaryEmail updates the user's primary email
+func (d *Database) UpdateUserPrimaryEmail(userId string, email string) error {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return err
+	}
+
+	// Run the transaction
+	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Update the current user's primary email as not primary
+		if _, err = d.GetCollection(mongodb.UserEmailCollection).UpdateOne(sc, bson.M{"user_id": *userObjectId, "is_primary": true, "revoked_at": bson.M{"$exists": false}}, bson.M{"$set": bson.M{"is_primary": false}}); err != nil {
+			return err
+		}
+
+		// Update the new user's primary email
+		if _, err = d.GetCollection(mongodb.UserEmailCollection).UpdateOne(sc, bson.M{"user_id": *userObjectId, "email": email, "revoked_at": bson.M{"$exists": false}}, bson.M{"$set": bson.M{"is_primary": true}}); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	return err
+}
+
+// DeleteUserEmail deletes an email from a user
+func (d *Database) DeleteUserEmail(ctx context.Context, userId string, email string) error {
+	// Convert the user ID to an object ID
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return err
 	}
 
 	// Revoke the user's email
-	_, err = d.GetCollection(mongodb.UserEmailCollection).UpdateOne(ctx, bson.M{"user_id": *objectId, "email": email, "is_primary": false, "revoked_at": bson.M{"$exists": false}}, bson.M{"revoked_at": time.Now()})
+	_, err = d.GetCollection(mongodb.UserEmailCollection).UpdateOne(ctx, bson.M{"user_id": *userObjectId, "email": email, "is_primary": false, "revoked_at": bson.M{"$exists": false}}, bson.M{"revoked_at": time.Now()})
 	return err
 }
 
@@ -513,21 +580,67 @@ func (d *Database) FindUserEmailPrimaryEmail(ctx context.Context, userId primiti
 	return userEmail, nil
 }
 
-// GetPrimaryEmail gets the user's primary email
-func (d *Database) GetPrimaryEmail(ctx context.Context, userId string) (email string, err error) {
+// GetUserPrimaryEmail gets the user's primary email
+func (d *Database) GetUserPrimaryEmail(ctx context.Context, userId string) (email string, err error) {
 	// Convert the user ID to an object ID
-	objectId, err := commonmongodb.GetObjectIdFromString(userId)
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
 	if err != nil {
 		return "", err
 	}
 
 	// Find the user's primary email
 	var userEmail *commonuser.UserEmail
-	userEmail, err = d.FindUserEmailPrimaryEmail(ctx, *objectId, bson.M{"email": 1}, nil)
+	userEmail, err = d.FindUserEmailPrimaryEmail(ctx, *userObjectId, bson.M{"email": 1}, nil)
 	if err != nil {
 		return "", err
 	}
 	return userEmail.Email, nil
+}
+
+// FindUserActiveEmails finds the user's active emails
+func (d *Database) FindUserActiveEmails(ctx context.Context, userId string, projection interface{}, sort interface{}) (emails []*commonuser.UserEmail, err error) {
+	// Convert the user ID to an object ID
+	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the find options
+	findOptions := commonmongodb.PrepareFindOptions(projection, sort, 0, 0)
+
+	// Find the user's active emails
+	cur, err := d.GetCollection(mongodb.UserEmailCollection).Find(ctx, bson.M{"user_id": *userObjectId, "revoked_at": bson.M{"$exists": false}}, findOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate through the cursor
+	for cur.Next(ctx) {
+		var userEmail commonuser.UserEmail
+		if err = cur.Decode(&userEmail); err != nil {
+			return nil, err
+		}
+		emails = append(emails, &userEmail)
+	}
+
+	return emails, nil
+}
+
+// GetUserActiveEmails gets the user's active emails
+func (d *Database) GetUserActiveEmails(ctx context.Context, userId string) (userActiveEmails []string, err error) {
+	// Find the user's active emails
+	var emails []*commonuser.UserEmail
+	emails, err = d.FindUserActiveEmails(ctx, userId, bson.M{"email": 1}, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Iterate through the emails
+	for _, email := range emails {
+		userActiveEmails = append(userActiveEmails, email.Email)
+	}
+
+	return userActiveEmails, nil
 }
 
 // UserEmailExists checks if the user's email exists
@@ -538,4 +651,35 @@ func (d *Database) UserEmailExists(ctx context.Context, userId primitive.ObjectI
 		return "", err
 	}
 	return userEmail.ID.Hex(), nil
+}
+
+// GetMyProfile gets the user's profile
+func (d *Database) GetMyProfile(userId string) (user *commonuser.User, userActiveEmails *[]string, userPhoneNumber string, err error) {
+	// Run the transaction
+	var activeEmails []string
+	err = commonmongodb.CreateTransaction(d.client, func(sc mongo.SessionContext) error {
+		// Get the full user profile
+		user, err = d.FindUserByUserId(sc, userId, bson.M{
+			"username":   1,
+			"first_name": 1,
+			"last_name":  1,
+			"birthdate":  1,
+			"joined_at":  1,
+		}, nil)
+
+		// Get the user's active emails
+		activeEmails, err = d.GetUserActiveEmails(sc, userId)
+
+		// Get the user's phone number
+		userPhoneNumber, err = d.GetUserPhoneNumber(sc, userId)
+
+		return nil
+	})
+
+	// Check if the transaction failed
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	return user, &activeEmails, userPhoneNumber, nil
 }
