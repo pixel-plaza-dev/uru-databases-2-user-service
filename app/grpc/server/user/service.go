@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"github.com/google/uuid"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	commongrpcclientctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/context"
@@ -62,6 +63,7 @@ func (s Server) SignUp(
 	}
 
 	// Create a new user
+	currentTime := time.Now()
 	userId := primitive.NewObjectID()
 	newUser := commonuser.User{
 		ID:             userId,
@@ -69,6 +71,7 @@ func (s Server) SignUp(
 		FirstName:      request.GetFirstName(),
 		LastName:       request.GetLastName(),
 		HashedPassword: hashedPassword,
+		JoinedAt:       currentTime,
 	}
 
 	// Add the birthdate if it exists
@@ -76,20 +79,25 @@ func (s Server) SignUp(
 		newUser.Birthdate = request.GetBirthdate().AsTime()
 	}
 
+	// Create the user shared identifier
+	newUserSharedId := commonuser.UserSharedIdentifier{
+		ID:     primitive.NewObjectID(),
+		UserID: userId,
+		UUID:   uuid.New().String(),
+	}
+
 	// Create the user email
-	currentTime := time.Now()
-	userEmailId := primitive.NewObjectID()
 	newUserEmail := commonuser.UserEmail{
-		ID:         userEmailId,
+		ID:         primitive.NewObjectID(),
 		UserID:     userId,
 		Email:      request.GetEmail(),
 		AssignedAt: currentTime,
+		IsPrimary:  true,
 	}
 
 	// Create the user phone number
-	userPhoneNumberId := primitive.NewObjectID()
 	newUserPhoneNumber := commonuser.UserPhoneNumber{
-		ID:          userPhoneNumberId,
+		ID:          primitive.NewObjectID(),
 		UserID:      userId,
 		PhoneNumber: request.GetPhoneNumber(),
 		AssignedAt:  currentTime,
@@ -98,6 +106,7 @@ func (s Server) SignUp(
 	// Insert the user into the user
 	if err = s.userDatabase.CreateUser(
 		&newUser,
+		&newUserSharedId,
 		&newUserEmail,
 		&newUserPhoneNumber,
 	); err != nil {
@@ -106,7 +115,7 @@ func (s Server) SignUp(
 	}
 
 	// User signed up successfully
-	s.logger.SignedUp(userId.Hex())
+	s.logger.SignedUp(userId.Hex(), request.GetUsername())
 
 	return &protobuf.SignUpResponse{
 		Message: SignUpSuccess,
@@ -143,7 +152,7 @@ func (s Server) IsPasswordCorrect(
 		// User checked password unsuccessfully
 		s.logger.PasswordIsIncorrect(userId)
 
-		return nil, status.Error(codes.OK, IsPasswordCorrectFailure)
+		return nil, status.Error(codes.OK, IsPasswordCorrectFailed)
 	}
 
 	// User checked password successfully
@@ -178,15 +187,14 @@ func (s Server) UsernameExists(
 		// Username does not exist
 		s.logger.UserNotFoundByUsername(request.GetUsername())
 
-		return nil, status.Error(codes.NotFound, FoundByUsernameFailure)
+		return nil, status.Error(codes.NotFound, FoundByUsernameFailed)
 	}
 
 	// User found by username
-	s.logger.UserFoundByUsername(request.GetUsername())
+	s.logger.UsernameExists(request.GetUsername())
 
 	return &protobuf.UsernameExistsResponse{
 		Message: FoundByUsernameSuccess,
-		Exists:  true,
 	}, nil
 }
 
@@ -209,15 +217,15 @@ func (s Server) GetUserIdByUsername(
 	}
 
 	// Check if the username doesn't exist
-	if userId == "" {
+	if err != nil {
 		// Username does not exist
 		s.logger.UserNotFoundByUsername(request.GetUsername())
 
-		return nil, status.Error(codes.NotFound, FoundByUsernameFailure)
+		return nil, status.Error(codes.NotFound, FoundByUsernameFailed)
 	}
 
 	// User found by username
-	s.logger.UserFoundByUsername(request.GetUsername())
+	s.logger.UserFoundByUsername(request.GetUsername(), userId)
 
 	return &protobuf.GetUserIdByUsernameResponse{
 		Message: FoundByUsernameSuccess,
@@ -244,19 +252,83 @@ func (s Server) GetUsernameByUserId(
 	}
 
 	// Check if the user ID doesn't exist
-	if username == "" {
+	if err != nil {
 		// User ID does not exist
 		s.logger.UserNotFoundByUserId(request.GetUserId())
 
-		return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
+		return nil, status.Error(codes.NotFound, FoundByUserIdFailed)
 	}
 
 	// User found by user ID
-	s.logger.UserFoundByUsername(request.GetUserId())
+	s.logger.UserFoundByUsername(request.GetUserId(), username)
 
 	return &protobuf.GetUsernameByUserIdResponse{
 		Message:  FoundByUserIdSuccess,
 		Username: username,
+	}, nil
+}
+
+// GetUserSharedIdByUserId gets the user's shared ID by user ID
+func (s Server) GetUserSharedIdByUserId(ctx context.Context, request *protobuf.GetUserSharedIdByUserIdRequest) (response *protobuf.GetUserSharedIdByUserIdResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateGetUserSharedIdByUserIdRequest(request); err != nil {
+		s.logger.GetUserSharedIdByUserIdFailed(err)
+		return nil, err
+	}
+
+	// Get the user shared ID by user ID
+	userSharedId, err := s.userDatabase.GetUserSharedIdByUserId(context.Background(), request.GetUserId())
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.GetUserSharedIdByUserIdFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the user shared ID doesn't exist
+	if err != nil {
+		// User ID does not exist
+		s.logger.UserNotFoundByUserId(request.GetUserId())
+
+		return nil, status.Error(codes.NotFound, FoundByUserIdFailed)
+	}
+
+	// User shared ID found by user ID
+	s.logger.UserSharedIdFoundByUserId(request.GetUserId(), userSharedId)
+
+	return &protobuf.GetUserSharedIdByUserIdResponse{
+		Message:      FoundByUserIdSuccess,
+		UserSharedId: userSharedId,
+	}, nil
+}
+
+// GetUserIdByUserSharedId gets the user's ID by shared ID
+func (s Server) GetUserIdByUserSharedId(ctx context.Context, request *protobuf.GetUserIdByUserSharedIdRequest) (response *protobuf.GetUserIdByUserSharedIdResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateGetUserIdByUserSharedIdRequest(request); err != nil {
+		s.logger.GetUserIdByUserSharedIdFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID by shared ID
+	userId, err := s.userDatabase.GetUserIdByUserSharedId(context.Background(), request.GetUserSharedId())
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.GetUserIdByUserSharedIdFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the user shared ID doesn't exist
+	if err != nil {
+		// User shared ID does not exist
+		s.logger.UserNotFoundBySharedId(request.GetUserSharedId())
+
+		return nil, status.Error(codes.NotFound, FoundByUserSharedIdFailed)
+	}
+
+	// User found by user shared ID
+	s.logger.UserFoundBySharedId(request.GetUserSharedId(), userId)
+
+	return &protobuf.GetUserIdByUserSharedIdResponse{
+		Message: FoundByUserSharedIdSuccess,
+		UserId:  userId,
 	}, nil
 }
 
@@ -283,7 +355,7 @@ func (s Server) GetProfile(
 		// User ID does not exist
 		s.logger.UserNotFoundByUserId(request.GetUserId())
 
-		return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
+		return nil, status.Error(codes.NotFound, FoundByUserIdFailed)
 	}
 
 	// User profile found by user ID
@@ -303,7 +375,7 @@ func (s Server) UpdateUser(
 	request *protobuf.UpdateUserRequest,
 ) (response *protobuf.UpdateUserResponse, err error) {
 	// Get the user ID from the access token
-	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
 		s.logger.MissingTokenClaimsSubject()
 		return nil, InternalServerError
@@ -329,14 +401,14 @@ func (s Server) UpdateUser(
 	}
 
 	// Update the user
-	_, err = s.userDatabase.UpdateUser(context.Background(), subject, &update)
+	_, err = s.userDatabase.UpdateUser(context.Background(), userId, &update)
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 		s.logger.UpdateUserFailed(err)
 		return nil, InternalServerError
 	}
 
 	// User found by user ID
-	s.logger.UpdateUser(subject)
+	s.logger.UpdateUser(userId)
 
 	return &protobuf.UpdateUserResponse{
 		Message: UpdatedSuccess,
@@ -355,14 +427,14 @@ func (s Server) ChangeUsername(
 	}
 
 	// Get the user ID from the access token
-	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
 		s.logger.MissingTokenClaimsSubject()
 		return nil, InternalServerError
 	}
 
 	// Update the user's username
-	err = s.userDatabase.UpdateUserUsername(subject, request.GetUsername())
+	err = s.userDatabase.UpdateUserUsername(userId, request.GetUsername())
 	if err != nil && !mongo.IsDuplicateKeyError(err) {
 		s.logger.UpdateUsernameFailed(err)
 		return nil, InternalServerError
@@ -377,7 +449,7 @@ func (s Server) ChangeUsername(
 	}
 
 	// Updated the user's username
-	s.logger.UpdateUsername(subject)
+	s.logger.UpdateUsername(userId, request.GetUsername())
 
 	return &protobuf.ChangeUsernameResponse{
 		Message: ChangeUsernameSuccess,
@@ -396,14 +468,14 @@ func (s Server) ChangePassword(
 	}
 
 	// Get the user ID from the access token
-	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
 		s.logger.MissingTokenClaimsSubject()
 		return nil, InternalServerError
 	}
 
 	// Check if the old password is correct
-	userHashedPassword, err := s.userDatabase.GetUserHashedPassword(context.Background(), subject)
+	userHashedPassword, err := s.userDatabase.GetUserHashedPassword(context.Background(), userId)
 	if err != nil {
 		s.logger.PasswordIsCorrectFailed(err)
 		return nil, InternalServerError
@@ -412,7 +484,7 @@ func (s Server) ChangePassword(
 	// Check if the password matches
 	matches := commonbcrypt.CheckPasswordHash(userHashedPassword.HashedPassword, request.GetOldPassword())
 	if !matches {
-		s.logger.PasswordIsIncorrect(subject)
+		s.logger.PasswordIsIncorrect(userId)
 		return nil, status.Error(codes.InvalidArgument, PasswordIsIncorrect)
 	}
 
@@ -430,14 +502,14 @@ func (s Server) ChangePassword(
 	}
 
 	// Update the user's password
-	err = s.userDatabase.UpdateUserPassword(grpcCtx, subject, hashedNewPassword)
+	err = s.userDatabase.UpdateUserPassword(grpcCtx, userId, hashedNewPassword)
 	if err != nil {
 		s.logger.UpdatePasswordFailed(err)
 		return nil, InternalServerError
 	}
 
 	// Updated the user's password
-	s.logger.UpdatePassword(subject)
+	s.logger.UpdatePassword(userId)
 
 	return &protobuf.ChangePasswordResponse{
 		Message: ChangePasswordSuccess,
@@ -450,21 +522,21 @@ func (s Server) GetPhoneNumber(
 	request *protobuf.GetPhoneNumberRequest,
 ) (*protobuf.GetPhoneNumberResponse, error) {
 	// Get the user ID from the access token
-	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
 		s.logger.MissingTokenClaimsSubject()
 		return nil, InternalServerError
 	}
 
 	// Get the current phone number by user ID
-	phoneNumber, err := s.userDatabase.GetUserPhoneNumber(context.Background(), subject)
+	phoneNumber, err := s.userDatabase.GetUserPhoneNumber(context.Background(), userId)
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 		s.logger.GetPhoneNumberFailed(err)
 		return nil, InternalServerError
 	}
 
 	// User found by user ID
-	s.logger.GetPhoneNumber(subject)
+	s.logger.GetPhoneNumber(userId, phoneNumber)
 
 	return &protobuf.GetPhoneNumberResponse{
 		Message:     GetPhoneNumbersSuccess,
@@ -484,24 +556,185 @@ func (s Server) ChangePhoneNumber(
 	}
 
 	// Get the user ID from the access token
-	subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
 		s.logger.MissingTokenClaimsSubject()
 		return nil, InternalServerError
 	}
 
 	// Update the user's phone number
-	err = s.userDatabase.UpdateUserPhoneNumber(subject, request.GetPhoneNumber())
+	err = s.userDatabase.UpdateUserPhoneNumber(userId, request.GetPhoneNumber())
 	if err != nil {
 		s.logger.UpdatePhoneNumberFailed(err)
 		return nil, InternalServerError
 	}
 
 	// Updated the user's phone number
-	s.logger.UpdatePhoneNumber(subject)
+	s.logger.UpdatePhoneNumber(userId, request.GetPhoneNumber())
 
 	return &protobuf.ChangePhoneNumberResponse{
 		Message: ChangePhoneNumberSuccess,
+	}, nil
+}
+
+// AddEmail adds an email to the user's account
+func (s Server) AddEmail(
+	ctx context.Context,
+	request *protobuf.AddEmailRequest,
+) (response *protobuf.AddEmailResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateAddEmailRequest(request); err != nil {
+		s.logger.AddEmailFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Add the email to the user's account
+	err = s.userDatabase.UpdateUserPhoneNumber(userId, request.GetEmail())
+	if err != nil && !errors.Is(mongodbuser.EmailAlreadyExistsError, err) {
+		s.logger.AddEmailFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the email already exists
+	if err != nil {
+		s.logger.UserEmailAlreadyExists(userId, request.GetEmail())
+
+		return nil, status.Error(codes.AlreadyExists, AddEmailFailed)
+	}
+
+	// Added email to the user's account
+	s.logger.AddEmail(userId, request.GetEmail())
+
+	return &protobuf.AddEmailResponse{
+		Message: AddEmailSuccess,
+	}, nil
+}
+
+// DeleteEmail deletes an email from the user's account
+func (s Server) DeleteEmail(
+	ctx context.Context,
+	request *protobuf.DeleteEmailRequest,
+) (response *protobuf.DeleteEmailResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateDeleteEmailRequest(request); err != nil {
+		s.logger.DeleteEmailFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Delete the email from the user's account
+	err = s.userDatabase.DeleteEmail(context.Background(), userId, request.GetEmail())
+	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
+		s.logger.DeleteEmailFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the email doesn't exist, or it's the primary email
+	if err != nil {
+		s.logger.DeleteEmailFailed(err)
+
+		return nil, status.Error(codes.NotFound, DeleteEmailFailed)
+	}
+
+	// Deleted email from the user's account
+	s.logger.DeleteEmail(userId, request.GetEmail())
+
+	return &protobuf.DeleteEmailResponse{
+		Message: DeleteEmailSuccess,
+	}, nil
+}
+
+// GetPrimaryEmail gets the user's primary email
+func (s Server) GetPrimaryEmail(
+	ctx context.Context,
+	request *protobuf.GetPrimaryEmailRequest,
+) (*protobuf.GetPrimaryEmailResponse, error) {
+	// Get the user ID from the access token
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Get the current primary email by user ID
+	primaryEmail, err := s.userDatabase.GetPrimaryEmail(context.Background(), userId)
+	if err != nil {
+		s.logger.GetPrimaryEmailFailed(err)
+		return nil, InternalServerError
+	}
+
+	// User primary email found by user ID
+	s.logger.GetPrimaryEmail(userId, primaryEmail)
+
+	return &protobuf.GetPrimaryEmailResponse{
+		Message: GetPrimaryEmailSuccess,
+		Email:   primaryEmail,
+	}, nil
+}
+
+// DeleteUser deletes the user's account
+func (s Server) DeleteUser(
+	ctx context.Context,
+	request *protobuf.DeleteUserRequest,
+) (response *protobuf.DeleteUserResponse, err error) {
+	// Validate the request
+	if err = s.validator.ValidateDeleteUserRequest(request); err != nil {
+		s.logger.DeleteUserFailed(err)
+		return nil, err
+	}
+
+	// Get the user ID from the access token
+	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
+	if err != nil {
+		s.logger.MissingTokenClaimsSubject()
+		return nil, InternalServerError
+	}
+
+	// Check if the password is correct
+	userHashedPassword, err := s.userDatabase.GetUserHashedPassword(context.Background(), userId)
+	if err != nil {
+		s.logger.PasswordIsCorrectFailed(err)
+		return nil, InternalServerError
+	}
+
+	// Check if the password matches
+	matches := commonbcrypt.CheckPasswordHash(userHashedPassword.HashedPassword, request.GetPassword())
+	if !matches {
+		s.logger.PasswordIsIncorrect(userId)
+		return nil, status.Error(codes.InvalidArgument, PasswordIsIncorrect)
+	}
+
+	// Get outgoing gRPC context
+	grpcCtx, err := commongrpcclientctx.GetOutgoingCtx(ctx)
+	if err != nil {
+		return nil, InternalServerError
+	}
+
+	// Delete user
+	err = s.userDatabase.DeleteUser(grpcCtx, userId)
+	if err != nil {
+		s.logger.DeleteUserFailed(err)
+		return nil, InternalServerError
+	}
+
+	// User deleted successfully
+	s.logger.DeleteUser(userId)
+
+	return &protobuf.DeleteUserResponse{
+		Message: DeleteUserSuccess,
 	}, nil
 }
 
@@ -512,14 +745,14 @@ func (s Server) GetMyProfile(
 ) (response *protobuf.GetMyProfileResponse, err error) {
 	/*
 		// Get the user ID from the access token
-		subject, err := commongrpcserverctx.GetCtxTokenClaimsSubject(ctx)
+		userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 		if err != nil {
 			s.logger.MissingTokenClaimsSubject()
 			return nil, InternalServerError
 		}
 
 		// Get the full profile by user ID
-		username, err := s.userDatabase.GetFullProfile(subject)
+		username, err := s.userDatabase.GetFullProfile(userId)
 		if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 			s.logger.GetProfileFailed(err)
 			return nil, InternalServerError
@@ -530,7 +763,7 @@ func (s Server) GetMyProfile(
 			// User ID does not exist
 			s.logger.UserNotFoundByUserId(request.GetUserId())
 
-			return nil, status.Error(codes.NotFound, FoundByUserIdFailure)
+			return nil, status.Error(codes.NotFound, FoundByUserIdFailed)
 		}
 
 		// User found by user ID
@@ -541,30 +774,6 @@ func (s Server) GetMyProfile(
 			Username: username,
 		}, nil
 	*/
-	return nil, InDevelopmentError
-}
-
-// AddEmail adds an email to the user's account
-func (s Server) AddEmail(
-	ctx context.Context,
-	request *protobuf.AddEmailRequest,
-) (*protobuf.AddEmailResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// DeleteEmail deletes an email from the user's account
-func (s Server) DeleteEmail(
-	ctx context.Context,
-	request *protobuf.DeleteEmailRequest,
-) (*protobuf.DeleteEmailResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// GetPrimaryEmail gets the user's primary email
-func (s Server) GetPrimaryEmail(
-	ctx context.Context,
-	request *protobuf.GetPrimaryEmailRequest,
-) (*protobuf.GetPrimaryEmailResponse, error) {
 	return nil, InDevelopmentError
 }
 
@@ -581,14 +790,6 @@ func (s Server) GetActiveEmails(
 	ctx context.Context,
 	request *protobuf.GetActiveEmailsRequest,
 ) (*protobuf.GetActiveEmailsResponse, error) {
-	return nil, InDevelopmentError
-}
-
-// DeleteUser deletes the user's account
-func (s Server) DeleteUser(
-	ctx context.Context,
-	request *protobuf.DeleteUserRequest,
-) (*protobuf.DeleteUserResponse, error) {
 	return nil, InDevelopmentError
 }
 

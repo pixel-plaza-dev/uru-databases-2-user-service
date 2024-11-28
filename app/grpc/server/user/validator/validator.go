@@ -121,6 +121,30 @@ func (d Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernam
 	return d.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
+// ValidateGetUserSharedIdByUserIdRequest validates the get user shared ID by user ID request
+func (d Validator) ValidateGetUserSharedIdByUserIdRequest(request *pbuser.GetUserSharedIdByUserIdRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"UserId": "user_id",
+		})
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateGetUserIdByUserSharedIdRequest validates the get user ID by user shared ID request
+func (d Validator) ValidateGetUserIdByUserSharedIdRequest(request *pbuser.GetUserIdByUserSharedIdRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"UserSharedId": "user_shared_id",
+		})
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
 // ValidateGetProfileRequest validates the get profile request
 func (d Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) error {
 	// Get validations from fields to validate
@@ -171,6 +195,48 @@ func (d Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneN
 		&map[string]string{
 			"PhoneNumber": "phone_number",
 		})
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateDeleteUserRequest validates the delete user request
+func (d Validator) ValidateDeleteUserRequest(request *pbuser.DeleteUserRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"Password": "password",
+		})
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateAddEmailRequest validates the add email request
+func (d Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"Email": "email",
+		})
+
+	// Check if the email is valid
+	d.validator.ValidateEmail("email", request.GetEmail(), validations)
+
+	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+}
+
+// ValidateDeleteEmailRequest validates the delete email request
+func (d Validator) ValidateDeleteEmailRequest(request *pbuser.DeleteEmailRequest) error {
+	// Get validations from fields to validate
+	validations := d.validator.ValidateNonEmptyStringFields(
+		request,
+		&map[string]string{
+			"Email": "email",
+		})
+
+	// Check if the email is valid
+	d.validator.ValidateEmail("email", request.GetEmail(), validations)
 
 	return d.validator.CheckValidations(validations, codes.InvalidArgument)
 }

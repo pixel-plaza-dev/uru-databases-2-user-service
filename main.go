@@ -184,7 +184,6 @@ func main() {
 	userDatabase, err := userdatabase.NewDatabase(
 		mongodbClient,
 		mongoDbName,
-		logger.UserDatabaseLogger,
 		authClient,
 	)
 	if err != nil {

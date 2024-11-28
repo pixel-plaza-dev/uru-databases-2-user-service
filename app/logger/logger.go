@@ -7,7 +7,6 @@ import (
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
 	commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/logger"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
-	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 )
 
 var (
@@ -25,7 +24,4 @@ var (
 
 	// UserServerLogger is the logger for the user server
 	UserServerLogger = userserver.NewLogger(commonlogger.NewDefaultLogger("User Server"))
-
-	// UserDatabaseLogger is the logger for the user database
-	UserDatabaseLogger = userdatabase.NewLogger(commonlogger.NewDefaultLogger("User Database"))
 )

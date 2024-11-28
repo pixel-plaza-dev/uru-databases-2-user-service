@@ -20,6 +20,14 @@ var (
 	// UserCollection is the users collection in MongoDB
 	UserCollection = commonmongodb.NewCollection("User", &userCollectionSingleFieldIndex, nil)
 
+	// userSharedIdentifierCollectionSingleFieldIndex is the single field indexes for the user collection
+	userSharedIdentifierCollectionSingleFieldIndex = []*commonmongodb.SingleFieldIndex{
+		commonmongodb.NewSingleFieldIndex(commonmongodb.FieldIndex{Name: "uuid", Order: commonmongodb.Ascending}, true),
+		commonmongodb.NewSingleFieldIndex(commonmongodb.FieldIndex{Name: "user_id", Order: commonmongodb.Ascending}, true)}
+
+	// UserSharedIdentifierCollection is the user shared identifiers collection in MongoDB
+	UserSharedIdentifierCollection = commonmongodb.NewCollection("UserSharedIdentifier", &userSharedIdentifierCollectionSingleFieldIndex, nil)
+
 	// UserEmailCollection is the user emails collection in MongoDB
 	UserEmailCollection = commonmongodb.NewCollection("UserEmail", nil, nil)
 
