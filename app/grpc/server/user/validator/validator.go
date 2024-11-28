@@ -4,7 +4,7 @@ import (
 	"context"
 	commongrpcvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/validator"
 	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
-	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
+	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	"google.golang.org/grpc/codes"
 )
 
@@ -17,13 +17,23 @@ type (
 )
 
 // NewValidator creates a new validator
-func NewValidator(userDatabase *mongodbuser.Database, validator commongrpcvalidator.Validator) *Validator {
+func NewValidator(
+	userDatabase *mongodbuser.Database,
+	validator commongrpcvalidator.Validator,
+) *Validator {
 	return &Validator{userDatabase: userDatabase, validator: validator}
 }
 
 // UsernameExists checks if the username exists
-func (d Validator) UsernameExists(usernameField string, username string, validations *map[string][]error) bool {
-	if exists, _ := d.userDatabase.UsernameExists(context.Background(), username); exists {
+func (v Validator) UsernameExists(
+	usernameField string,
+	username string,
+	validations *map[string][]error,
+) bool {
+	if exists, _ := v.userDatabase.UsernameExists(
+		context.Background(),
+		username,
+	); exists {
 		(*validations)[usernameField] = append(
 			(*validations)[usernameField],
 			UsernameTakenError,
@@ -34,14 +44,14 @@ func (d Validator) UsernameExists(usernameField string, username string, validat
 }
 
 // ValidateSignUpRequest validates the sign up request
-func (d Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
+func (v Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
 	// Get the request fields
 	usernameField := "username"
 	emailField := "email"
 	birthdateField := "birthdate"
 
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Password":    "password",
@@ -50,17 +60,22 @@ func (d Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
 			"LastName":    "last_name",
 			"Email":       emailField,
 			"PhoneNumber": "phone_number",
-		})
+		},
+	)
 
 	// Check if the user already exists
-	usernameExists := d.UsernameExists(usernameField, request.GetUsername(), validations)
+	usernameExists := v.UsernameExists(
+		usernameField,
+		request.GetUsername(),
+		validations,
+	)
 
 	// Check if the email is valid
-	d.validator.ValidateEmail(emailField, request.GetEmail(), validations)
+	v.validator.ValidateEmail(emailField, request.GetEmail(), validations)
 
 	// Check if the birthdate is valid
 	if birthdate := request.GetBirthdate(); birthdate != nil {
-		d.validator.ValidateBirthdate(birthdateField, birthdate, validations)
+		v.validator.ValidateBirthdate(birthdateField, birthdate, validations)
 	}
 
 	// Get the code
@@ -69,189 +84,206 @@ func (d Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
 		code = codes.AlreadyExists
 	}
 
-	return d.validator.CheckValidations(validations, code)
+	return v.validator.CheckValidations(validations, code)
 }
 
 // ValidateIsPasswordCorrectRequest validates the is password correct request
-func (d Validator) ValidateIsPasswordCorrectRequest(request *pbuser.IsPasswordCorrectRequest) error {
+func (v Validator) ValidateIsPasswordCorrectRequest(request *pbuser.IsPasswordCorrectRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
 			"Password": "password",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateUsernameExistsRequest validates the username exists request
-func (d Validator) ValidateUsernameExistsRequest(request *pbuser.UsernameExistsRequest) error {
+func (v Validator) ValidateUsernameExistsRequest(request *pbuser.UsernameExistsRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateGetUserIdByUsernameRequest validates the get user ID by username request
-func (d Validator) ValidateGetUserIdByUsernameRequest(request *pbuser.GetUserIdByUsernameRequest) error {
+func (v Validator) ValidateGetUserIdByUsernameRequest(request *pbuser.GetUserIdByUsernameRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateGetUsernameByUserIdRequest validates the get username by user ID request
-func (d Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernameByUserIdRequest) error {
+func (v Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernameByUserIdRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserId": "user_id",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateGetUserSharedIdByUserIdRequest validates the get user shared ID by user ID request
-func (d Validator) ValidateGetUserSharedIdByUserIdRequest(request *pbuser.GetUserSharedIdByUserIdRequest) error {
+func (v Validator) ValidateGetUserSharedIdByUserIdRequest(request *pbuser.GetUserSharedIdByUserIdRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserId": "user_id",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateGetUserIdByUserSharedIdRequest validates the get user ID by user shared ID request
-func (d Validator) ValidateGetUserIdByUserSharedIdRequest(request *pbuser.GetUserIdByUserSharedIdRequest) error {
+func (v Validator) ValidateGetUserIdByUserSharedIdRequest(request *pbuser.GetUserIdByUserSharedIdRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserSharedId": "user_shared_id",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateGetProfileRequest validates the get profile request
-func (d Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) error {
+func (v Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserId": "user_id",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateChangeUsernameRequest validates the change username request
-func (d Validator) ValidateChangeUsernameRequest(request *pbuser.ChangeUsernameRequest) error {
+func (v Validator) ValidateChangeUsernameRequest(request *pbuser.ChangeUsernameRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateChangePasswordRequest validates the change password request
-func (d Validator) ValidateChangePasswordRequest(request *pbuser.ChangePasswordRequest) error {
+func (v Validator) ValidateChangePasswordRequest(request *pbuser.ChangePasswordRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"OldPassword": "old_password",
 			"NewPassword": "new_password",
-		})
+		},
+	)
 
 	// Check if the new password is different from the old password
 	if request.GetOldPassword() == request.GetNewPassword() {
-		(*validations)["new_password"] = append((*validations)["new_password"], NewPasswordSameAsOldError)
+		(*validations)["new_password"] = append(
+			(*validations)["new_password"],
+			NewPasswordSameAsOldError,
+		)
 	}
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateChangePhoneNumberRequest validates the change phone number request
-func (d Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneNumberRequest) error {
+func (v Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneNumberRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"PhoneNumber": "phone_number",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateDeleteUserRequest validates the delete user request
-func (d Validator) ValidateDeleteUserRequest(request *pbuser.DeleteUserRequest) error {
+func (v Validator) ValidateDeleteUserRequest(request *pbuser.DeleteUserRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Password": "password",
-		})
+		},
+	)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateAddEmailRequest validates the add email request
-func (d Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) error {
+func (v Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",
-		})
+		},
+	)
 
 	// Check if the email is valid
-	d.validator.ValidateEmail("email", request.GetEmail(), validations)
+	v.validator.ValidateEmail("email", request.GetEmail(), validations)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateChangePrimaryEmailRequest validates the change primary email request
-func (d Validator) ValidateChangePrimaryEmailRequest(request *pbuser.ChangePrimaryEmailRequest) error {
+func (v Validator) ValidateChangePrimaryEmailRequest(request *pbuser.ChangePrimaryEmailRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",
-		})
+		},
+	)
 
 	// Check if the email is valid
-	d.validator.ValidateEmail("email", request.GetEmail(), validations)
+	v.validator.ValidateEmail("email", request.GetEmail(), validations)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }
 
 // ValidateDeleteEmailRequest validates the delete email request
-func (d Validator) ValidateDeleteEmailRequest(request *pbuser.DeleteEmailRequest) error {
+func (v Validator) ValidateDeleteEmailRequest(request *pbuser.DeleteEmailRequest) error {
 	// Get validations from fields to validate
-	validations := d.validator.ValidateNonEmptyStringFields(
+	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",
-		})
+		},
+	)
 
 	// Check if the email is valid
-	d.validator.ValidateEmail("email", request.GetEmail(), validations)
+	v.validator.ValidateEmail("email", request.GetEmail(), validations)
 
-	return d.validator.CheckValidations(validations, codes.InvalidArgument)
+	return v.validator.CheckValidations(validations, codes.InvalidArgument)
 }

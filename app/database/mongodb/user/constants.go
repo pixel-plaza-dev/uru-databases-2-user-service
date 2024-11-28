@@ -1,4 +1,4 @@
-package mongodb
+package user
 
 import (
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
@@ -15,28 +15,65 @@ const (
 var (
 	// userCollectionSingleFieldIndex is the single field indexes for the user collection
 	userCollectionSingleFieldIndex = []*commonmongodb.SingleFieldIndex{
-		commonmongodb.NewSingleFieldIndex(commonmongodb.FieldIndex{Name: "username", Order: commonmongodb.Ascending}, true)}
+		commonmongodb.NewSingleFieldIndex(
+			commonmongodb.FieldIndex{
+				Name:  "username",
+				Order: commonmongodb.Ascending,
+			}, true,
+		),
+	}
 
 	// UserCollection is the users collection in MongoDB
-	UserCollection = commonmongodb.NewCollection("User", &userCollectionSingleFieldIndex, nil)
+	UserCollection = commonmongodb.NewCollection(
+		"User",
+		&userCollectionSingleFieldIndex,
+		nil,
+	)
 
 	// userSharedIdentifierCollectionSingleFieldIndex is the single field indexes for the user collection
 	userSharedIdentifierCollectionSingleFieldIndex = []*commonmongodb.SingleFieldIndex{
-		commonmongodb.NewSingleFieldIndex(commonmongodb.FieldIndex{Name: "uuid", Order: commonmongodb.Ascending}, true),
-		commonmongodb.NewSingleFieldIndex(commonmongodb.FieldIndex{Name: "user_id", Order: commonmongodb.Ascending}, true)}
+		commonmongodb.NewSingleFieldIndex(
+			commonmongodb.FieldIndex{
+				Name:  "uuid",
+				Order: commonmongodb.Ascending,
+			}, true,
+		),
+		commonmongodb.NewSingleFieldIndex(
+			commonmongodb.FieldIndex{
+				Name:  "user_id",
+				Order: commonmongodb.Ascending,
+			}, true,
+		),
+	}
 
 	// UserSharedIdentifierCollection is the user shared identifiers collection in MongoDB
-	UserSharedIdentifierCollection = commonmongodb.NewCollection("UserSharedIdentifier", &userSharedIdentifierCollectionSingleFieldIndex, nil)
+	UserSharedIdentifierCollection = commonmongodb.NewCollection(
+		"UserSharedIdentifier",
+		&userSharedIdentifierCollectionSingleFieldIndex,
+		nil,
+	)
 
 	// UserEmailCollection is the user emails collection in MongoDB
 	UserEmailCollection = commonmongodb.NewCollection("UserEmail", nil, nil)
 
 	// UserPhoneNumberCollection is the user phone numbers collection in MongoDB
-	UserPhoneNumberCollection = commonmongodb.NewCollection("UserPhoneNumber", nil, nil)
+	UserPhoneNumberCollection = commonmongodb.NewCollection(
+		"UserPhoneNumber",
+		nil,
+		nil,
+	)
 
 	// UserUsernameLogCollection is the user username log collection in MongoDB
-	UserUsernameLogCollection = commonmongodb.NewCollection("UserUsernameLog", nil, nil)
+	UserUsernameLogCollection = commonmongodb.NewCollection(
+		"UserUsernameLog",
+		nil,
+		nil,
+	)
 
 	// UserHashedPasswordLogCollection is the user hashed password log collection in MongoDB
-	UserHashedPasswordLogCollection = commonmongodb.NewCollection("UserHashedPasswordLog", nil, nil)
+	UserHashedPasswordLogCollection = commonmongodb.NewCollection(
+		"UserHashedPasswordLog",
+		nil,
+		nil,
+	)
 )

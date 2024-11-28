@@ -18,14 +18,14 @@ import (
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
 	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
 	detailsuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/details/user"
+	appmongodb "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb"
+	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
 	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb"
-	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/mongodb/database/user"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -62,19 +62,19 @@ func main() {
 	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.PortKey)
 
 	// Get the MongoDB URI
-	mongoDbUri, err := commonenv.LoadVariable(mongodb.UriKey)
+	mongoDbUri, err := commonenv.LoadVariable(userdatabase.UriKey)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.UriKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(userdatabase.UriKey)
 
 	// Get the required MongoDB database name
-	mongoDbName, err := commonenv.LoadVariable(mongodb.DbNameKey)
+	mongoDbName, err := commonenv.LoadVariable(userdatabase.DbNameKey)
 	if err != nil {
 
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(mongodb.DbNameKey)
+	logger.EnvironmentLogger.EnvironmentVariableLoaded(userdatabase.DbNameKey)
 
 	// Get the gRPC services URI
 	var uris = make(map[string]string)
@@ -115,7 +115,7 @@ func main() {
 	// Get the MongoDB configuration
 	mongoDbConfig := &commonmongodb.Config{
 		Uri:     mongoDbUri,
-		Timeout: mongodb.ConnectionCtxTimeout,
+		Timeout: appmongodb.ConnectionCtxTimeout,
 	}
 
 	// Get the connection handler
@@ -234,7 +234,10 @@ func main() {
 	serverValidator := commongrpcvalidator.NewDefaultValidator()
 
 	// Create the gRPC user server validator
-	userServerValidator := userservervalidator.NewValidator(userDatabase, serverValidator)
+	userServerValidator := userservervalidator.NewValidator(
+		userDatabase,
+		serverValidator,
+	)
 
 	// Create the gRPC user server
 	userServer := userserver.NewServer(
@@ -246,7 +249,6 @@ func main() {
 
 	// Register the user server with the gRPC server
 	protobuf.RegisterUserServer(s, userServer)
-	logger.ListenerLogger.ServerStarted(servicePort.Port)
 
 	// Listen on the given port
 	portListener, err := net.Listen("tcp", servicePort.FormattedPort)
@@ -260,9 +262,9 @@ func main() {
 	}()
 
 	// Serve the gRPC server
+	logger.ListenerLogger.ServerStarted(servicePort.Port)
 	if err = s.Serve(portListener); err != nil {
 		panic(commonlistener.FailedToServeError)
 	}
-	logger.ListenerLogger.ServerStarted(servicePort.Port)
 	defer s.Stop()
 }
