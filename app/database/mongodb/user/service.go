@@ -3,7 +3,6 @@ package user
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commonmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
@@ -89,15 +88,6 @@ func (d *Database) NewUserHashedPasswordLog(
 	}
 }
 
-// NewUserSharedIdentifier creates a new user shared identifier object
-func (d *Database) NewUserSharedIdentifier(userId *primitive.ObjectID) commonmongodbuser.UserSharedIdentifier {
-	return commonmongodbuser.UserSharedIdentifier{
-		ID:     primitive.NewObjectID(),
-		UserID: *userId,
-		UUID:   uuid.New().String(),
-	}
-}
-
 // NewUserEmail creates a new user email object
 func (d *Database) NewUserEmail(
 	userId *primitive.ObjectID,
@@ -157,22 +147,6 @@ func (d *Database) CreateUserUsernameLog(
 	_, err := d.GetCollection(UserUsernameLogCollection).InsertOne(
 		ctx,
 		userUsernameLog,
-	)
-	return err
-}
-
-// CreateUserSharedIdentifier creates a new user shared identifier and inserts it into the database
-func (d *Database) CreateUserSharedIdentifier(
-	ctx context.Context,
-	userId *primitive.ObjectID,
-) error {
-	// Create the UserSharedIdentifier object
-	userSharedId := d.NewUserSharedIdentifier(userId)
-
-	// Insert user shared identifier
-	_, err := d.GetCollection(UserSharedIdentifierCollection).InsertOne(
-		ctx,
-		userSharedId,
 	)
 	return err
 }
@@ -253,11 +227,6 @@ func (d *Database) InsertUser(
 				sc,
 				userPhoneNumber,
 			); err != nil {
-				return err
-			}
-
-			// Create a new shared identifier for the user
-			if err := d.CreateUserSharedIdentifier(sc, &user.ID); err != nil {
 				return err
 			}
 
@@ -352,6 +321,22 @@ func (d *Database) FindUserByUserId(
 	return d.FindUser(ctx, bson.M{"_id": *userObjectId}, projection, sort)
 }
 
+// FindUserBySharedUserId finds a user by the shared user ID
+func (d *Database) FindUserBySharedUserId(
+	ctx context.Context,
+	sharedUserId string,
+	projection interface{},
+	sort interface{},
+) (user *commonmongodbuser.User, err error) {
+	// Check if the shared user ID is empty
+	if sharedUserId == "" {
+		return nil, mongo.ErrNoDocuments
+	}
+
+	// Find the user
+	return d.FindUser(ctx, bson.M{"uuid": sharedUserId}, projection, sort)
+}
+
 // GetUserHashedPassword gets the user's hashed password
 func (d *Database) GetUserHashedPassword(
 	ctx context.Context,
@@ -366,7 +351,7 @@ func (d *Database) GetUserHashedPassword(
 	return d.FindUserByUsername(
 		ctx,
 		username,
-		bson.M{"_id": 1, "hashed_password": 1},
+		bson.M{"_id": 1, "hashed_password": 1, "uuid": 1},
 		nil,
 	)
 }
@@ -533,56 +518,22 @@ func (d *Database) GetUserProfile(
 	)
 }
 
-// FindUserSharedIdentifier finds a user's shared identifier
-func (d *Database) FindUserSharedIdentifier(
-	ctx context.Context,
-	filter interface{},
-	projection interface{},
-	sort interface{},
-) (userSharedIdentifier *commonmongodbuser.UserSharedIdentifier, err error) {
-	// Set the default projection
-	if projection == nil {
-		projection = bson.M{"_id": 1}
-	}
-
-	// Create the find options
-	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
-
-	// Find the user's shared identifier
-	err = d.GetCollection(UserSharedIdentifierCollection).FindOne(
-		ctx,
-		filter,
-		findOptions,
-	).Decode(userSharedIdentifier)
-	if err != nil {
-		return nil, err
-	}
-	return userSharedIdentifier, nil
-}
-
 // GetUserSharedIdByUserId gets the user's shared identifier by the user ID
 func (d *Database) GetUserSharedIdByUserId(
 	ctx context.Context,
 	userId string,
 ) (userSharedId string, err error) {
-	// Convert the user ID to an object ID
-	userObjectId, err := commonmongodb.GetObjectIdFromString(userId)
-	if err != nil {
-		return "", err
-	}
-
-	// Find the user's shared identifier
-	var userSharedIdentifier *commonmongodbuser.UserSharedIdentifier
-	userSharedIdentifier, err = d.FindUserSharedIdentifier(
+	// Get the user's shared identifier
+	user, err := d.FindUserByUserId(
 		ctx,
-		bson.M{"user_id": *userObjectId},
+		userId,
 		bson.M{"uuid": 1},
 		nil,
 	)
 	if err != nil {
 		return "", err
 	}
-	return userSharedIdentifier.UUID, nil
+	return user.UUID, nil
 }
 
 // GetUserIdByUserSharedId gets the user ID by the user shared ID
@@ -590,17 +541,17 @@ func (d *Database) GetUserIdByUserSharedId(
 	ctx context.Context,
 	userSharedId string,
 ) (userId string, err error) {
-	// Find the user's shared identifier
-	userSharedIdentifier, err := d.FindUserSharedIdentifier(
+	// Find the user ID by the user shared ID
+	user, err := d.FindUserBySharedUserId(
 		ctx,
-		bson.M{"uuid": userSharedId},
-		bson.M{"user_id": 1},
+		userSharedId,
+		bson.M{"_id": 1},
 		nil,
 	)
 	if err != nil {
 		return "", err
 	}
-	return userSharedIdentifier.UserID.Hex(), nil
+	return user.ID.Hex(), nil
 }
 
 // FindUserPhoneNumber finds a user's phone number

@@ -2,12 +2,13 @@ package user
 
 import (
 	"errors"
+	"github.com/google/uuid"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	commongrpcclientctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/context"
 	commongrpcserverctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/context"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
-	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
+	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
 	appmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	"go.mongodb.org/mongo-driver/bson"
@@ -26,7 +27,7 @@ type Server struct {
 	authClient   pbauth.AuthClient
 	logger       Logger
 	validator    *userservervalidator.Validator
-	protobuf.UnimplementedUserServer
+	pbuser.UnimplementedUserServer
 }
 
 // NewServer creates a new gRPC user server
@@ -47,8 +48,8 @@ func NewServer(
 // SignUp creates a new user
 func (s Server) SignUp(
 	ctx context.Context,
-	request *protobuf.SignUpRequest,
-) (response *protobuf.SignUpResponse, err error) {
+	request *pbuser.SignUpRequest,
+) (response *pbuser.SignUpResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateSignUpRequest(request); err != nil {
 		s.logger.FailedToSignUp(err)
@@ -72,6 +73,7 @@ func (s Server) SignUp(
 		LastName:       request.GetLastName(),
 		HashedPassword: hashedPassword,
 		JoinedAt:       currentTime,
+		UUID:           uuid.New().String(),
 	}
 
 	// Add the birthdate if it exists
@@ -109,15 +111,15 @@ func (s Server) SignUp(
 	// User signed up successfully
 	s.logger.SignedUp(userId.Hex(), request.GetUsername())
 
-	return &protobuf.SignUpResponse{
+	return &pbuser.SignUpResponse{
 		Message: SignedUp,
 	}, nil
 }
 
 func (s Server) IsPasswordCorrect(
 	ctx context.Context,
-	request *protobuf.IsPasswordCorrectRequest,
-) (response *protobuf.IsPasswordCorrectResponse, err error) {
+	request *pbuser.IsPasswordCorrectRequest,
+) (response *pbuser.IsPasswordCorrectResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateIsPasswordCorrectRequest(request); err != nil {
 		s.logger.FailedToComparePassword(err)
@@ -161,17 +163,18 @@ func (s Server) IsPasswordCorrect(
 	// User checked password successfully
 	s.logger.PasswordIsCorrect(userId)
 
-	return &protobuf.IsPasswordCorrectResponse{
-		Message: PasswordIsCorrect,
-		UserId:  userId,
+	return &pbuser.IsPasswordCorrectResponse{
+		Message:      PasswordIsCorrect,
+		UserId:       userId,
+		UserSharedId: user.UUID,
 	}, nil
 }
 
 // UsernameExists checks if the username exists
 func (s Server) UsernameExists(
 	ctx context.Context,
-	request *protobuf.UsernameExistsRequest,
-) (response *protobuf.UsernameExistsResponse, err error) {
+	request *pbuser.UsernameExistsRequest,
+) (response *pbuser.UsernameExistsResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateUsernameExistsRequest(request); err != nil {
 		s.logger.FailedToCheckIfUsernameExists(err)
@@ -199,7 +202,7 @@ func (s Server) UsernameExists(
 	// User found by username
 	s.logger.UsernameExists(request.GetUsername())
 
-	return &protobuf.UsernameExistsResponse{
+	return &pbuser.UsernameExistsResponse{
 		Message: FoundByUsername,
 	}, nil
 }
@@ -207,8 +210,8 @@ func (s Server) UsernameExists(
 // GetUserIdByUsername gets the user's ID by username
 func (s Server) GetUserIdByUsername(
 	ctx context.Context,
-	request *protobuf.GetUserIdByUsernameRequest,
-) (response *protobuf.GetUserIdByUsernameResponse, err error) {
+	request *pbuser.GetUserIdByUsernameRequest,
+) (response *pbuser.GetUserIdByUsernameResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateGetUserIdByUsernameRequest(request); err != nil {
 		s.logger.FailedToGetUserIdByUsername(err)
@@ -236,7 +239,7 @@ func (s Server) GetUserIdByUsername(
 	// User found by username
 	s.logger.UserFoundByUsername(request.GetUsername(), userId)
 
-	return &protobuf.GetUserIdByUsernameResponse{
+	return &pbuser.GetUserIdByUsernameResponse{
 		Message: FoundByUsername,
 		UserId:  userId,
 	}, nil
@@ -245,8 +248,8 @@ func (s Server) GetUserIdByUsername(
 // GetUsernameByUserId gets the user's username by ID
 func (s Server) GetUsernameByUserId(
 	ctx context.Context,
-	request *protobuf.GetUsernameByUserIdRequest,
-) (response *protobuf.GetUsernameByUserIdResponse, err error) {
+	request *pbuser.GetUsernameByUserIdRequest,
+) (response *pbuser.GetUsernameByUserIdResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateGetUsernameByUserIdRequest(request); err != nil {
 		s.logger.FailedToGetUsernameByUserId(err)
@@ -274,7 +277,7 @@ func (s Server) GetUsernameByUserId(
 	// User found by user ID
 	s.logger.UserFoundByUsername(request.GetUserId(), username)
 
-	return &protobuf.GetUsernameByUserIdResponse{
+	return &pbuser.GetUsernameByUserIdResponse{
 		Message:  FoundByUserId,
 		Username: username,
 	}, nil
@@ -283,8 +286,8 @@ func (s Server) GetUsernameByUserId(
 // GetUserSharedIdByUserId gets the user's shared ID by user ID
 func (s Server) GetUserSharedIdByUserId(
 	ctx context.Context,
-	request *protobuf.GetUserSharedIdByUserIdRequest,
-) (response *protobuf.GetUserSharedIdByUserIdResponse, err error) {
+	request *pbuser.GetUserSharedIdByUserIdRequest,
+) (response *pbuser.GetUserSharedIdByUserIdResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateGetUserSharedIdByUserIdRequest(request); err != nil {
 		s.logger.FailedToGetUserSharedIdByUserId(err)
@@ -312,7 +315,7 @@ func (s Server) GetUserSharedIdByUserId(
 	// User shared ID found by user ID
 	s.logger.UserSharedIdFoundByUserId(request.GetUserId(), userSharedId)
 
-	return &protobuf.GetUserSharedIdByUserIdResponse{
+	return &pbuser.GetUserSharedIdByUserIdResponse{
 		Message:      FoundByUserId,
 		UserSharedId: userSharedId,
 	}, nil
@@ -321,8 +324,8 @@ func (s Server) GetUserSharedIdByUserId(
 // GetUserIdByUserSharedId gets the user's ID by shared ID
 func (s Server) GetUserIdByUserSharedId(
 	ctx context.Context,
-	request *protobuf.GetUserIdByUserSharedIdRequest,
-) (response *protobuf.GetUserIdByUserSharedIdResponse, err error) {
+	request *pbuser.GetUserIdByUserSharedIdRequest,
+) (response *pbuser.GetUserIdByUserSharedIdResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateGetUserIdByUserSharedIdRequest(request); err != nil {
 		s.logger.FailedToGetUserIdByUserSharedId(err)
@@ -350,7 +353,7 @@ func (s Server) GetUserIdByUserSharedId(
 	// User found by user shared ID
 	s.logger.UserFoundBySharedId(request.GetUserSharedId(), userId)
 
-	return &protobuf.GetUserIdByUserSharedIdResponse{
+	return &pbuser.GetUserIdByUserSharedIdResponse{
 		Message: FoundByUserSharedId,
 		UserId:  userId,
 	}, nil
@@ -359,8 +362,8 @@ func (s Server) GetUserIdByUserSharedId(
 // GetProfile gets the user's profile
 func (s Server) GetProfile(
 	ctx context.Context,
-	request *protobuf.GetProfileRequest,
-) (response *protobuf.GetProfileResponse, err error) {
+	request *pbuser.GetProfileRequest,
+) (response *pbuser.GetProfileResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateGetProfileRequest(request); err != nil {
 		s.logger.FailedToGetUserProfile(err)
@@ -388,7 +391,7 @@ func (s Server) GetProfile(
 	// User profile found by user ID
 	s.logger.GetUserProfile(request.GetUserId())
 
-	return &protobuf.GetProfileResponse{
+	return &pbuser.GetProfileResponse{
 		Message:   FetchedUserProfile,
 		Username:  profile.Username,
 		FirstName: profile.FirstName,
@@ -400,8 +403,8 @@ func (s Server) GetProfile(
 // UpdateUser updates the user
 func (s Server) UpdateUser(
 	ctx context.Context,
-	request *protobuf.UpdateUserRequest,
-) (response *protobuf.UpdateUserResponse, err error) {
+	request *pbuser.UpdateUserRequest,
+) (response *pbuser.UpdateUserResponse, err error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
@@ -438,7 +441,7 @@ func (s Server) UpdateUser(
 	// User found by user ID
 	s.logger.UpdatedUser(userId)
 
-	return &protobuf.UpdateUserResponse{
+	return &pbuser.UpdateUserResponse{
 		Message: Updated,
 	}, nil
 }
@@ -446,8 +449,8 @@ func (s Server) UpdateUser(
 // ChangeUsername changes the user's username
 func (s Server) ChangeUsername(
 	ctx context.Context,
-	request *protobuf.ChangeUsernameRequest,
-) (response *protobuf.ChangeUsernameResponse, err error) {
+	request *pbuser.ChangeUsernameRequest,
+) (response *pbuser.ChangeUsernameResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateChangeUsernameRequest(request); err != nil {
 		s.logger.FailedToGetUserProfile(err)
@@ -479,7 +482,7 @@ func (s Server) ChangeUsername(
 	// Updated the user's username
 	s.logger.UpdatedUsername(userId, request.GetUsername())
 
-	return &protobuf.ChangeUsernameResponse{
+	return &pbuser.ChangeUsernameResponse{
 		Message: UpdatedUsername,
 	}, nil
 }
@@ -487,8 +490,8 @@ func (s Server) ChangeUsername(
 // ChangePassword changes the user's password
 func (s Server) ChangePassword(
 	ctx context.Context,
-	request *protobuf.ChangePasswordRequest,
-) (response *protobuf.ChangePasswordResponse, err error) {
+	request *pbuser.ChangePasswordRequest,
+) (response *pbuser.ChangePasswordResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateChangePasswordRequest(request); err != nil {
 		s.logger.FailedToUpdatePassword(err)
@@ -545,7 +548,7 @@ func (s Server) ChangePassword(
 	// Updated the user's password
 	s.logger.UpdatedPassword(userId)
 
-	return &protobuf.ChangePasswordResponse{
+	return &pbuser.ChangePasswordResponse{
 		Message: UpdatedPassword,
 	}, nil
 }
@@ -553,8 +556,8 @@ func (s Server) ChangePassword(
 // GetPhoneNumber gets the user's phone number
 func (s Server) GetPhoneNumber(
 	ctx context.Context,
-	request *protobuf.GetPhoneNumberRequest,
-) (*protobuf.GetPhoneNumberResponse, error) {
+	request *pbuser.GetPhoneNumberRequest,
+) (*pbuser.GetPhoneNumberResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
@@ -575,7 +578,7 @@ func (s Server) GetPhoneNumber(
 	// User found by user ID
 	s.logger.GetUserPhoneNumber(userId, phoneNumber)
 
-	return &protobuf.GetPhoneNumberResponse{
+	return &pbuser.GetPhoneNumberResponse{
 		Message:     FetchedPhoneNumber,
 		PhoneNumber: phoneNumber,
 	}, nil
@@ -584,8 +587,8 @@ func (s Server) GetPhoneNumber(
 // ChangePhoneNumber changes the user's phone number
 func (s Server) ChangePhoneNumber(
 	ctx context.Context,
-	request *protobuf.ChangePhoneNumberRequest,
-) (response *protobuf.ChangePhoneNumberResponse, err error) {
+	request *pbuser.ChangePhoneNumberRequest,
+) (response *pbuser.ChangePhoneNumberResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateChangePhoneNumberRequest(request); err != nil {
 		s.logger.FailedToUpdatePhoneNumber(err)
@@ -609,7 +612,7 @@ func (s Server) ChangePhoneNumber(
 	// Updated the user's phone number
 	s.logger.UpdatedUserPhoneNumber(userId, request.GetPhoneNumber())
 
-	return &protobuf.ChangePhoneNumberResponse{
+	return &pbuser.ChangePhoneNumberResponse{
 		Message: UpdatedPhoneNumber,
 	}, nil
 }
@@ -617,8 +620,8 @@ func (s Server) ChangePhoneNumber(
 // AddEmail adds an email to the user's account
 func (s Server) AddEmail(
 	ctx context.Context,
-	request *protobuf.AddEmailRequest,
-) (response *protobuf.AddEmailResponse, err error) {
+	request *pbuser.AddEmailRequest,
+) (response *pbuser.AddEmailResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateAddEmailRequest(request); err != nil {
 		s.logger.FailedToAddUserEmail(err)
@@ -649,7 +652,7 @@ func (s Server) AddEmail(
 	// Added email to the user's account
 	s.logger.AddedUserEmail(userId, request.GetEmail())
 
-	return &protobuf.AddEmailResponse{
+	return &pbuser.AddEmailResponse{
 		Message: AddedUserEmail,
 	}, nil
 }
@@ -657,8 +660,8 @@ func (s Server) AddEmail(
 // DeleteEmail deletes an email from the user's account
 func (s Server) DeleteEmail(
 	ctx context.Context,
-	request *protobuf.DeleteEmailRequest,
-) (response *protobuf.DeleteEmailResponse, err error) {
+	request *pbuser.DeleteEmailRequest,
+) (response *pbuser.DeleteEmailResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateDeleteEmailRequest(request); err != nil {
 		s.logger.FailedToDeleteUserEmail(err)
@@ -693,7 +696,7 @@ func (s Server) DeleteEmail(
 	// Deleted email from the user's account
 	s.logger.DeletedUserEmail(userId, request.GetEmail())
 
-	return &protobuf.DeleteEmailResponse{
+	return &pbuser.DeleteEmailResponse{
 		Message: DeletedUserEmail,
 	}, nil
 }
@@ -701,8 +704,8 @@ func (s Server) DeleteEmail(
 // GetPrimaryEmail gets the user's primary email
 func (s Server) GetPrimaryEmail(
 	ctx context.Context,
-	request *protobuf.GetPrimaryEmailRequest,
-) (*protobuf.GetPrimaryEmailResponse, error) {
+	request *pbuser.GetPrimaryEmailRequest,
+) (*pbuser.GetPrimaryEmailResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
@@ -723,7 +726,7 @@ func (s Server) GetPrimaryEmail(
 	// User primary email found by user ID
 	s.logger.GetUserPrimaryEmail(userId, primaryEmail)
 
-	return &protobuf.GetPrimaryEmailResponse{
+	return &pbuser.GetPrimaryEmailResponse{
 		Message: FetchedUserPrimaryEmail,
 		Email:   primaryEmail,
 	}, nil
@@ -732,8 +735,8 @@ func (s Server) GetPrimaryEmail(
 // ChangePrimaryEmail changes the user's primary email
 func (s Server) ChangePrimaryEmail(
 	ctx context.Context,
-	request *protobuf.ChangePrimaryEmailRequest,
-) (response *protobuf.ChangePrimaryEmailResponse, err error) {
+	request *pbuser.ChangePrimaryEmailRequest,
+) (response *pbuser.ChangePrimaryEmailResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateChangePrimaryEmailRequest(request); err != nil {
 		s.logger.FailedToUpdateUserPrimaryEmail(err)
@@ -764,7 +767,7 @@ func (s Server) ChangePrimaryEmail(
 	// Change user primary email
 	s.logger.UpdatedUserPrimaryEmail(userId, request.GetEmail())
 
-	return &protobuf.ChangePrimaryEmailResponse{
+	return &pbuser.ChangePrimaryEmailResponse{
 		Message: UpdatedUserPrimaryEmail,
 	}, nil
 }
@@ -772,8 +775,8 @@ func (s Server) ChangePrimaryEmail(
 // GetActiveEmails gets the user's active emails
 func (s Server) GetActiveEmails(
 	ctx context.Context,
-	request *protobuf.GetActiveEmailsRequest,
-) (*protobuf.GetActiveEmailsResponse, error) {
+	request *pbuser.GetActiveEmailsRequest,
+) (*pbuser.GetActiveEmailsResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
@@ -794,7 +797,7 @@ func (s Server) GetActiveEmails(
 	// User active emails found by user ID
 	s.logger.GetUserActiveEmails(userId)
 
-	return &protobuf.GetActiveEmailsResponse{
+	return &pbuser.GetActiveEmailsResponse{
 		Message: FetchedUserActiveEmails,
 		Emails:  activeEmails,
 	}, nil
@@ -803,8 +806,8 @@ func (s Server) GetActiveEmails(
 // DeleteUser deletes the user's account
 func (s Server) DeleteUser(
 	ctx context.Context,
-	request *protobuf.DeleteUserRequest,
-) (response *protobuf.DeleteUserResponse, err error) {
+	request *pbuser.DeleteUserRequest,
+) (response *pbuser.DeleteUserResponse, err error) {
 	// Validate the request
 	if err = s.validator.ValidateDeleteUserRequest(request); err != nil {
 		s.logger.FailedToDeleteUser(err)
@@ -854,7 +857,7 @@ func (s Server) DeleteUser(
 	// User deleted successfully
 	s.logger.DeletedUser(userId)
 
-	return &protobuf.DeleteUserResponse{
+	return &pbuser.DeleteUserResponse{
 		Message: DeletedUser,
 	}, nil
 }
@@ -862,8 +865,8 @@ func (s Server) DeleteUser(
 // GetMyProfile gets the user's profile
 func (s Server) GetMyProfile(
 	ctx context.Context,
-	request *protobuf.GetMyProfileRequest,
-) (response *protobuf.GetMyProfileResponse, err error) {
+	request *pbuser.GetMyProfileRequest,
+) (response *pbuser.GetMyProfileResponse, err error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
@@ -881,7 +884,7 @@ func (s Server) GetMyProfile(
 	// User own profile found by user ID
 	s.logger.GetUserOwnProfile(userId)
 
-	return &protobuf.GetMyProfileResponse{
+	return &pbuser.GetMyProfileResponse{
 		Message:     FetchedUserOwnProfile,
 		Username:    fullProfile.Username,
 		FirstName:   fullProfile.FirstName,
@@ -898,47 +901,47 @@ func (s Server) GetMyProfile(
 // SendVerificationEmail sends a verification email to the user
 func (s Server) SendVerificationEmail(
 	ctx context.Context,
-	request *protobuf.SendVerificationEmailRequest,
-) (*protobuf.SendVerificationEmailResponse, error) {
+	request *pbuser.SendVerificationEmailRequest,
+) (*pbuser.SendVerificationEmailResponse, error) {
 	return nil, InDevelopmentError
 }
 
 // VerifyEmail verifies the user's email
 func (s Server) VerifyEmail(
 	ctx context.Context,
-	request *protobuf.VerifyEmailRequest,
-) (*protobuf.VerifyEmailResponse, error) {
+	request *pbuser.VerifyEmailRequest,
+) (*pbuser.VerifyEmailResponse, error) {
 	return nil, InDevelopmentError
 }
 
 // VerifyPhoneNumber verifies the user's phone number
 func (s Server) VerifyPhoneNumber(
 	ctx context.Context,
-	request *protobuf.VerifyPhoneNumberRequest,
-) (*protobuf.VerifyPhoneNumberResponse, error) {
+	request *pbuser.VerifyPhoneNumberRequest,
+) (*pbuser.VerifyPhoneNumberResponse, error) {
 	return nil, InDevelopmentError
 }
 
 // SendVerificationSMS sends a verification SMS to the user
 func (s Server) SendVerificationSMS(
 	ctx context.Context,
-	request *protobuf.SendVerificationSMSRequest,
-) (*protobuf.SendVerificationSMSResponse, error) {
+	request *pbuser.SendVerificationSMSRequest,
+) (*pbuser.SendVerificationSMSResponse, error) {
 	return nil, InDevelopmentError
 }
 
 // ForgotPassword sends a password reset link to the user's email
 func (s Server) ForgotPassword(
 	ctx context.Context,
-	request *protobuf.ForgotPasswordRequest,
-) (*protobuf.ForgotPasswordResponse, error) {
+	request *pbuser.ForgotPasswordRequest,
+) (*pbuser.ForgotPasswordResponse, error) {
 	return nil, InDevelopmentError
 }
 
 // ResetPassword resets the user's password
 func (s Server) ResetPassword(
 	ctx context.Context,
-	request *protobuf.ResetPasswordRequest,
-) (*protobuf.ResetPasswordResponse, error) {
+	request *pbuser.ResetPasswordRequest,
+) (*pbuser.ResetPasswordResponse, error) {
 	return nil, InDevelopmentError
 }

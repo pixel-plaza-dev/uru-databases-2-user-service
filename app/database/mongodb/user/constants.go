@@ -21,6 +21,12 @@ var (
 				Order: commonmongodb.Ascending,
 			}, true,
 		),
+		commonmongodb.NewSingleFieldIndex(
+			commonmongodb.FieldIndex{
+				Name:  "uuid",
+				Order: commonmongodb.Ascending,
+			}, true,
+		),
 	}
 
 	// UserCollection is the users collection in MongoDB
@@ -30,26 +36,10 @@ var (
 		nil,
 	)
 
-	// userSharedIdentifierCollectionSingleFieldIndex is the single field indexes for the user collection
-	userSharedIdentifierCollectionSingleFieldIndex = []*commonmongodb.SingleFieldIndex{
-		commonmongodb.NewSingleFieldIndex(
-			commonmongodb.FieldIndex{
-				Name:  "uuid",
-				Order: commonmongodb.Ascending,
-			}, true,
-		),
-		commonmongodb.NewSingleFieldIndex(
-			commonmongodb.FieldIndex{
-				Name:  "user_id",
-				Order: commonmongodb.Ascending,
-			}, true,
-		),
-	}
-
 	// UserSharedIdentifierCollection is the user shared identifiers collection in MongoDB
 	UserSharedIdentifierCollection = commonmongodb.NewCollection(
 		"UserSharedIdentifier",
-		&userSharedIdentifierCollectionSingleFieldIndex,
+		nil,
 		nil,
 	)
 
