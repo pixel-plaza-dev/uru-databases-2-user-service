@@ -97,7 +97,7 @@ func (s Server) SignUp(
 	}
 
 	// Insert the user into the user
-	if err = s.userDatabase.CreateUser(
+	if err = s.userDatabase.InsertUser(
 		&newUser,
 		&newUserEmail,
 		&newUserPhoneNumber,

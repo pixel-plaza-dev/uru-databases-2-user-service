@@ -63,8 +63,8 @@ func (d *Database) GetCollection(collection *commonmongodb.Collection) *mongo.Co
 	return d.database.Collection(collection.Name)
 }
 
-// CreateUserUsernameLogObject creates a new user username log object
-func (d *Database) CreateUserUsernameLogObject(
+// NewUserUsernameLog creates a new user username log object
+func (d *Database) NewUserUsernameLog(
 	userId *primitive.ObjectID,
 	username string,
 ) commonmongodbuser.UserUsernameLog {
@@ -76,8 +76,8 @@ func (d *Database) CreateUserUsernameLogObject(
 	}
 }
 
-// CreateUserHashedPasswordLogObject creates a new user hashed password log object
-func (d *Database) CreateUserHashedPasswordLogObject(
+// NewUserHashedPasswordLog creates a new user hashed password log object
+func (d *Database) NewUserHashedPasswordLog(
 	userId *primitive.ObjectID,
 	hashedPassword string,
 ) commonmongodbuser.UserHashedPasswordLog {
@@ -89,12 +89,38 @@ func (d *Database) CreateUserHashedPasswordLogObject(
 	}
 }
 
-// CreateUserSharedIdentifierObject creates a new user shared identifier object
-func (d *Database) CreateUserSharedIdentifierObject(userId *primitive.ObjectID) commonmongodbuser.UserSharedIdentifier {
+// NewUserSharedIdentifier creates a new user shared identifier object
+func (d *Database) NewUserSharedIdentifier(userId *primitive.ObjectID) commonmongodbuser.UserSharedIdentifier {
 	return commonmongodbuser.UserSharedIdentifier{
 		ID:     primitive.NewObjectID(),
 		UserID: *userId,
 		UUID:   uuid.New().String(),
+	}
+}
+
+// NewUserEmail creates a new user email object
+func (d *Database) NewUserEmail(
+	userId *primitive.ObjectID,
+	email string,
+) commonmongodbuser.UserEmail {
+	return commonmongodbuser.UserEmail{
+		ID:         primitive.NewObjectID(),
+		UserID:     *userId,
+		Email:      email,
+		AssignedAt: time.Now(),
+	}
+}
+
+// NewUserPhoneNumber creates a new user phone number object
+func (d *Database) NewUserPhoneNumber(
+	userId *primitive.ObjectID,
+	phoneNumber string,
+) commonmongodbuser.UserPhoneNumber {
+	return commonmongodbuser.UserPhoneNumber{
+		ID:          primitive.NewObjectID(),
+		UserID:      *userId,
+		PhoneNumber: phoneNumber,
+		AssignedAt:  time.Now(),
 	}
 }
 
@@ -105,12 +131,12 @@ func (d *Database) CreateUserHashedPasswordLog(
 	hashedPassword string,
 ) error {
 	// Create the UserHashedPasswordLog object
-	userHashedPasswordLog := d.CreateUserHashedPasswordLogObject(
+	userHashedPasswordLog := d.NewUserHashedPasswordLog(
 		userId,
 		hashedPassword,
 	)
 
-	// Create a new user hashed password log
+	// Insert user hashed password log
 	_, err := d.GetCollection(UserHashedPasswordLogCollection).InsertOne(
 		ctx,
 		userHashedPasswordLog,
@@ -118,16 +144,16 @@ func (d *Database) CreateUserHashedPasswordLog(
 	return err
 }
 
-// CreateUserUsernameLog creates a new user username log
+// CreateUserUsernameLog creates a new user username log and inserts it into the database
 func (d *Database) CreateUserUsernameLog(
 	ctx context.Context,
 	userId *primitive.ObjectID,
 	username string,
 ) error {
 	// Create the UserUsernameLog object
-	userUsernameLog := d.CreateUserUsernameLogObject(userId, username)
+	userUsernameLog := d.NewUserUsernameLog(userId, username)
 
-	// Create a new user username log
+	// Insert user username log
 	_, err := d.GetCollection(UserUsernameLogCollection).InsertOne(
 		ctx,
 		userUsernameLog,
@@ -135,15 +161,15 @@ func (d *Database) CreateUserUsernameLog(
 	return err
 }
 
-// CreateUserSharedIdentifier creates a new user shared identifier
+// CreateUserSharedIdentifier creates a new user shared identifier and inserts it into the database
 func (d *Database) CreateUserSharedIdentifier(
 	ctx context.Context,
 	userId *primitive.ObjectID,
 ) error {
 	// Create the UserSharedIdentifier object
-	userSharedId := d.CreateUserSharedIdentifierObject(userId)
+	userSharedId := d.NewUserSharedIdentifier(userId)
 
-	// Create a new user shared identifier
+	// Insert user shared identifier
 	_, err := d.GetCollection(UserSharedIdentifierCollection).InsertOne(
 		ctx,
 		userSharedId,
@@ -151,8 +177,8 @@ func (d *Database) CreateUserSharedIdentifier(
 	return err
 }
 
-// CreateUserEmail creates a new user email
-func (d *Database) CreateUserEmail(
+// InsertUserEmail inserts a user email into the database
+func (d *Database) InsertUserEmail(
 	ctx context.Context,
 	userEmail *commonmongodbuser.UserEmail,
 ) error {
@@ -160,8 +186,22 @@ func (d *Database) CreateUserEmail(
 	return err
 }
 
-// CreateUserPhoneNumber creates a new user phone number
-func (d *Database) CreateUserPhoneNumber(
+// CreateUserEmail creates a new user email and inserts it into the database
+func (d *Database) CreateUserEmail(
+	ctx context.Context,
+	userId *primitive.ObjectID,
+	email string,
+) error {
+	// Create the UserEmail object
+	userEmail := d.NewUserEmail(userId, email)
+
+	// Insert user email
+	err := d.InsertUserEmail(ctx, &userEmail)
+	return err
+}
+
+// InsertUserPhoneNumber inserts a user phone number into the database
+func (d *Database) InsertUserPhoneNumber(
 	ctx context.Context,
 	userPhoneNumber *commonmongodbuser.UserPhoneNumber,
 ) error {
@@ -172,8 +212,22 @@ func (d *Database) CreateUserPhoneNumber(
 	return err
 }
 
-// CreateUser creates a new user
-func (d *Database) CreateUser(
+// CreateUserPhoneNumber creates a new user phone number and inserts it into the database
+func (d *Database) CreateUserPhoneNumber(
+	ctx context.Context,
+	userId *primitive.ObjectID,
+	phoneNumber string,
+) error {
+	// Create the UserPhoneNumber object
+	userPhoneNumber := d.NewUserPhoneNumber(userId, phoneNumber)
+
+	// Insert user phone number
+	err := d.InsertUserPhoneNumber(ctx, &userPhoneNumber)
+	return err
+}
+
+// InsertUser inserts a user into the database
+func (d *Database) InsertUser(
 	user *commonmongodbuser.User,
 	userEmail *commonmongodbuser.UserEmail,
 	userPhoneNumber *commonmongodbuser.UserPhoneNumber,
@@ -181,26 +235,29 @@ func (d *Database) CreateUser(
 	// Run the transaction
 	err := commonmongodb.CreateTransaction(
 		d.client, func(sc mongo.SessionContext) error {
-			// Create a new email for the user
-			if err := d.CreateUserEmail(sc, userEmail); err != nil {
+			// Insert user
+			if _, err := d.GetCollection(UserCollection).InsertOne(
+				sc,
+				user,
+			); err != nil {
 				return err
 			}
 
-			// Create a new phone number for the user
-			if err := d.CreateUserPhoneNumber(sc, userPhoneNumber); err != nil {
+			// Insert user email
+			if err := d.InsertUserEmail(sc, userEmail); err != nil {
+				return err
+			}
+
+			// Insert user phone number
+			if err := d.InsertUserPhoneNumber(
+				sc,
+				userPhoneNumber,
+			); err != nil {
 				return err
 			}
 
 			// Create a new shared identifier for the user
 			if err := d.CreateUserSharedIdentifier(sc, &user.ID); err != nil {
-				return err
-			}
-
-			// Create a new user
-			if _, err := d.GetCollection(UserCollection).InsertOne(
-				sc,
-				user,
-			); err != nil {
 				return err
 			}
 
@@ -632,14 +689,11 @@ func (d *Database) UpdateUserPhoneNumber(
 				return err
 			}
 
-			// Update the user's phone number
+			// Create a new user phone number
 			if err = d.CreateUserPhoneNumber(
-				sc, &commonmongodbuser.UserPhoneNumber{
-					ID:          primitive.NewObjectID(),
-					UserID:      *userObjectId,
-					PhoneNumber: phoneNumber,
-					AssignedAt:  time.Now(),
-				},
+				sc,
+				userObjectId,
+				phoneNumber,
 			); err != nil {
 				return err
 			}
@@ -712,16 +766,8 @@ func (d *Database) AddUserEmail(
 				return EmailAlreadyExistsError
 			}
 
-			// Add the email to the user
-			err = d.CreateUserEmail(
-				ctx, &commonmongodbuser.UserEmail{
-					ID:         primitive.NewObjectID(),
-					UserID:     *userObjectId,
-					Email:      email,
-					AssignedAt: time.Now(),
-				},
-			)
-
+			// Create the new user email
+			err = d.CreateUserEmail(ctx, userObjectId, email)
 			return err
 		},
 	)
