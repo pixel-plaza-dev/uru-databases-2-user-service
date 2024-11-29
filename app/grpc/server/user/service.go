@@ -145,8 +145,8 @@ func (s Server) IsPasswordCorrect(
 
 	// Check if the password matches
 	matches := commonbcrypt.CheckPasswordHash(
-		user.HashedPassword,
 		request.GetPassword(),
+		user.HashedPassword,
 	)
 
 	// Get the user ID
