@@ -202,16 +202,6 @@ func (l Logger) FailedToGetUserIdByUserSharedId(err error) {
 	)
 }
 
-// MissingTokenClaimsSubject logs the missing token claims subject
-func (l Logger) MissingTokenClaimsSubject() {
-	l.logger.LogMessage(
-		commonlogger.NewLogMessage(
-			"Missing token claims subject",
-			commonlogger.StatusFailed,
-		),
-	)
-}
-
 // UpdatedUser logs the user update
 func (l Logger) UpdatedUser(userId string) {
 	l.logger.LogMessage(

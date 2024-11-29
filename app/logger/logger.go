@@ -3,6 +3,7 @@ package logger
 import (
 	commonenv "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/env"
 	commonflag "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/config/flag"
+	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
 	commondatabase "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database"
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
 	commonlogger "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/utils/logger"
@@ -10,18 +11,21 @@ import (
 )
 
 var (
-	// FlagLogger is the logger for the flag
-	FlagLogger = commonflag.NewLogger(commonlogger.NewDefaultLogger("Flag"))
+	// Flag is the logger for the flag
+	Flag = commonflag.NewLogger(commonlogger.NewDefaultLogger("Flag"))
 
-	// ListenerLogger is the logger for the listener
-	ListenerLogger = commonlistener.NewLogger(commonlogger.NewDefaultLogger("Net Listener"))
+	// Listener is the logger for the listener
+	Listener = commonlistener.NewLogger(commonlogger.NewDefaultLogger("Net Listener"))
 
-	// EnvironmentLogger is the logger for the environment
-	EnvironmentLogger = commonenv.NewLogger(commonlogger.NewDefaultLogger("Environment"))
+	// Environment is the logger for the environment
+	Environment = commonenv.NewLogger(commonlogger.NewDefaultLogger("Environment"))
 
-	// MongoDbLogger is the logger for the MongoDB client
-	MongoDbLogger = commondatabase.NewLogger(commonlogger.NewDefaultLogger("MongoDB"))
+	// MongoDb is the logger for the MongoDB client
+	MongoDb = commondatabase.NewLogger(commonlogger.NewDefaultLogger("MongoDB"))
 
-	// UserServerLogger is the logger for the user server
-	UserServerLogger = userserver.NewLogger(commonlogger.NewDefaultLogger("User Server"))
+	// UserServer is the logger for the user server
+	UserServer = userserver.NewLogger(commonlogger.NewDefaultLogger("User Server"))
+
+	// JwtValidator is the logger for the JWT validator
+	JwtValidator = commonjwtvalidator.NewLogger(commonlogger.NewDefaultLogger("JWT Validator"))
 )

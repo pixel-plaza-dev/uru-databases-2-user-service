@@ -11,6 +11,7 @@ import (
 	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
 	appmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
+	applogger "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -408,7 +409,7 @@ func (s Server) UpdateUser(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -460,7 +461,7 @@ func (s Server) ChangeUsername(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -501,7 +502,7 @@ func (s Server) ChangePassword(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -561,7 +562,7 @@ func (s Server) GetPhoneNumber(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -598,7 +599,7 @@ func (s Server) ChangePhoneNumber(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -631,7 +632,7 @@ func (s Server) AddEmail(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -671,7 +672,7 @@ func (s Server) DeleteEmail(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -709,7 +710,7 @@ func (s Server) GetPrimaryEmail(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -746,7 +747,7 @@ func (s Server) ChangePrimaryEmail(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -780,7 +781,7 @@ func (s Server) GetActiveEmails(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -817,7 +818,7 @@ func (s Server) DeleteUser(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 
@@ -870,7 +871,7 @@ func (s Server) GetMyProfile(
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
 	if err != nil {
-		s.logger.MissingTokenClaimsSubject()
+		applogger.JwtValidator.MissingTokenClaimsUserId()
 		return nil, InternalServerError
 	}
 

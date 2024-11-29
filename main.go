@@ -24,8 +24,8 @@ import (
 	userserver "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user"
 	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	appjwt "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/jwt"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
-	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
+	applistener "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/listener"
+	applogger "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -38,7 +38,7 @@ func init() {
 	// Declare flags and parse them
 	commonflag.SetModeFlag()
 	flag.Parse()
-	logger.FlagLogger.ModeFlagSet(commonflag.Mode)
+	applogger.Flag.ModeFlagSet(commonflag.Mode)
 
 	// Check if the environment is production
 	if commonflag.Mode.IsProd() {
@@ -54,19 +54,19 @@ func main() {
 	// Get the listener port
 	servicePort, err := commonlistener.LoadServicePort(
 		"0.0.0.0",
-		listener.PortKey,
+		applistener.PortKey,
 	)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(listener.PortKey)
+	applogger.Environment.EnvironmentVariableLoaded(applistener.PortKey)
 
 	// Get the MongoDB URI
 	mongoDbUri, err := commonenv.LoadVariable(userdatabase.UriKey)
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(userdatabase.UriKey)
+	applogger.Environment.EnvironmentVariableLoaded(userdatabase.UriKey)
 
 	// Get the required MongoDB database name
 	mongoDbName, err := commonenv.LoadVariable(userdatabase.DbNameKey)
@@ -74,7 +74,7 @@ func main() {
 
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(userdatabase.DbNameKey)
+	applogger.Environment.EnvironmentVariableLoaded(userdatabase.DbNameKey)
 
 	// Get the gRPC services URI
 	var uris = make(map[string]string)
@@ -83,7 +83,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		logger.EnvironmentLogger.EnvironmentVariableLoaded(key)
+		applogger.Environment.EnvironmentVariableLoaded(key)
 		uris[key] = uri
 	}
 
@@ -92,7 +92,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	logger.EnvironmentLogger.EnvironmentVariableLoaded(appjwt.PublicKey)
+	applogger.Environment.EnvironmentVariableLoaded(appjwt.PublicKey)
 
 	// Load Google Cloud service account credentials
 	googleCredentials, err := commongcloud.LoadGoogleCredentials(context.Background())
@@ -192,9 +192,9 @@ func main() {
 	defer func() {
 		// Disconnect from MongoDB
 		mongodbConnection.Disconnect()
-		logger.MongoDbLogger.DisconnectedFromDatabase()
+		applogger.MongoDb.DisconnectedFromDatabase()
 	}()
-	logger.MongoDbLogger.ConnectedToDatabase()
+	applogger.MongoDb.ConnectedToDatabase()
 
 	// Create token validator
 	tokenValidator, err := commonjwtvalidatorgrpc.NewDefaultTokenValidator(
@@ -243,7 +243,7 @@ func main() {
 	userServer := userserver.NewServer(
 		userDatabase,
 		authClient,
-		logger.UserServerLogger,
+		applogger.UserServer,
 		userServerValidator,
 	)
 
@@ -262,7 +262,7 @@ func main() {
 	}()
 
 	// Serve the gRPC server
-	logger.ListenerLogger.ServerStarted(servicePort.Port)
+	applogger.Listener.ServerStarted(servicePort.Port)
 	if err = s.Serve(portListener); err != nil {
 		panic(commonlistener.FailedToServeError)
 	}
