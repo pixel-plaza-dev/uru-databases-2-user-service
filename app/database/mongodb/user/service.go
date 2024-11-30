@@ -395,8 +395,8 @@ func (d *Database) UsernameExists(
 	return user != nil, nil
 }
 
-// UpdateUser updates a user
-func (d *Database) UpdateUser(
+// UpdateUserByUserId updates a user by the user ID
+func (d *Database) UpdateUserByUserId(
 	ctx context.Context,
 	userId string,
 	update interface{},
@@ -484,10 +484,10 @@ func (d *Database) UpdateUserPassword(
 				return err
 			}
 
-			// Close all user sessions
-			_, err = d.authClient.CloseSessions(
+			// Revoke all user's refresh tokens
+			_, err = d.authClient.RevokeRefreshTokens(
 				grpcCtx,
-				&pbauth.CloseSessionsRequest{},
+				&pbauth.RevokeRefreshTokensRequest{},
 			)
 
 			return nil
@@ -502,7 +502,7 @@ func (d *Database) UpdateUserProfile(
 	userId string,
 	update interface{},
 ) (result *mongo.UpdateResult, err error) {
-	return d.UpdateUser(ctx, userId, update)
+	return d.UpdateUserByUserId(ctx, userId, update)
 }
 
 // GetUserProfile gets the user's profile
@@ -675,10 +675,10 @@ func (d *Database) DeleteUser(grpcCtx context.Context, userId string) error {
 				return err
 			}
 
-			// Close all user sessions
-			_, err = d.authClient.CloseSessions(
+			// Revoke all user's refresh tokens
+			_, err = d.authClient.RevokeRefreshTokens(
 				grpcCtx,
-				&pbauth.CloseSessionsRequest{},
+				&pbauth.RevokeRefreshTokensRequest{},
 			)
 
 			return nil

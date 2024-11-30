@@ -16,8 +16,8 @@ import (
 	commonlistener "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/listener"
 	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/tls"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
-	protobuf "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
-	detailsuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/details/user"
+	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
+	pbconfiguser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/config/grpc/user"
 	appmongodb "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
@@ -216,7 +216,7 @@ func main() {
 	// Create server authentication interceptor
 	serverAuthInterceptor, err := serverauth.NewInterceptor(
 		jwtValidator,
-		&detailsuser.GRPCInterceptions,
+		&pbconfiguser.Interceptions,
 	)
 	if err != nil {
 		panic(err)
@@ -245,10 +245,11 @@ func main() {
 		authClient,
 		applogger.UserServer,
 		userServerValidator,
+		applogger.JwtValidator,
 	)
 
 	// Register the user server with the gRPC server
-	protobuf.RegisterUserServer(s, userServer)
+	pbuser.RegisterUserServer(s, userServer)
 
 	// Listen on the given port
 	portListener, err := net.Listen("tcp", servicePort.FormattedPort)
