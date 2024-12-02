@@ -241,12 +241,12 @@ func (l Logger) FailedToGetUserPhoneNumber(err error) {
 }
 
 // GetUserProfile logs the user profile update
-func (l Logger) GetUserProfile(userId string) {
+func (l Logger) GetUserProfile(username string) {
 	l.logger.LogMessage(
 		commonlogger.NewLogMessage(
 			"Fetched user profile",
 			commonlogger.StatusSuccess,
-			userId,
+			username,
 		),
 	)
 }

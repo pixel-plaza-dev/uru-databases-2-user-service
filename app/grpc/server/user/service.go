@@ -8,8 +8,8 @@ import (
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
 	commongrpcclientctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/client/context"
 	commongrpcserverctx "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/context"
-	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
-	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/auth"
+	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/user"
 	appmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	userservervalidator "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc/server/user/validator"
 	"go.mongodb.org/mongo-driver/bson"
@@ -18,6 +18,7 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
@@ -374,30 +375,29 @@ func (s Server) GetProfile(
 		return nil, err
 	}
 
-	// Get the profile by user ID
+	// Get the profile by username
 	profile, err := s.userDatabase.GetUserProfile(
 		context.Background(),
-		request.GetUserId(),
+		request.GetUsername(),
 	)
 	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
 		s.logger.FailedToGetUserProfile(err)
 		return nil, InternalServerError
 	}
 
-	// Check if the user ID doesn't exist
+	// Check if the username doesn't exist
 	if err != nil {
-		// User ID does not exist
-		s.logger.UserNotFoundByUserId(request.GetUserId())
+		// Username does not exist
+		s.logger.UserNotFoundByUsername(request.GetUsername())
 
 		return nil, status.Error(codes.NotFound, NotFoundByUserId)
 	}
 
-	// User profile found by user ID
-	s.logger.GetUserProfile(request.GetUserId())
+	// User profile found by username
+	s.logger.GetUserProfile(request.GetUsername())
 
 	return &pbuser.GetProfileResponse{
 		Message:   FetchedUserProfile,
-		Username:  profile.Username,
 		FirstName: profile.FirstName,
 		LastName:  profile.LastName,
 		JoinedAt:  timestamppb.New(profile.JoinedAt),
@@ -564,7 +564,7 @@ func (s Server) ChangePassword(
 // GetPhoneNumber gets the user's phone number
 func (s Server) GetPhoneNumber(
 	ctx context.Context,
-	request *pbuser.GetPhoneNumberRequest,
+	request *emptypb.Empty,
 ) (*pbuser.GetPhoneNumberResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
@@ -712,7 +712,7 @@ func (s Server) DeleteEmail(
 // GetPrimaryEmail gets the user's primary email
 func (s Server) GetPrimaryEmail(
 	ctx context.Context,
-	request *pbuser.GetPrimaryEmailRequest,
+	request *emptypb.Empty,
 ) (*pbuser.GetPrimaryEmailResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
@@ -783,7 +783,7 @@ func (s Server) ChangePrimaryEmail(
 // GetActiveEmails gets the user's active emails
 func (s Server) GetActiveEmails(
 	ctx context.Context,
-	request *pbuser.GetActiveEmailsRequest,
+	request *emptypb.Empty,
 ) (*pbuser.GetActiveEmailsResponse, error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)
@@ -873,7 +873,7 @@ func (s Server) DeleteUser(
 // GetMyProfile gets the user's profile
 func (s Server) GetMyProfile(
 	ctx context.Context,
-	request *pbuser.GetMyProfileRequest,
+	request *emptypb.Empty,
 ) (response *pbuser.GetMyProfileResponse, err error) {
 	// Get the user ID from the access token
 	userId, err := commongrpcserverctx.GetCtxTokenClaimsUserId(ctx)

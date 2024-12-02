@@ -5,10 +5,11 @@ import (
 	"errors"
 	commonmongodb "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb"
 	commonmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
-	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/auth"
+	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/auth"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"time"
 )
 
@@ -487,7 +488,7 @@ func (d *Database) UpdateUserPassword(
 			// Revoke all user's refresh tokens
 			_, err = d.authClient.RevokeRefreshTokens(
 				grpcCtx,
-				&pbauth.RevokeRefreshTokensRequest{},
+				&emptypb.Empty{},
 			)
 
 			return nil
@@ -508,12 +509,12 @@ func (d *Database) UpdateUserProfile(
 // GetUserProfile gets the user's profile
 func (d *Database) GetUserProfile(
 	ctx context.Context,
-	userId string,
+	username string,
 ) (user *commonmongodbuser.User, err error) {
-	return d.FindUserByUserId(
+	return d.FindUserByUsername(
 		ctx,
-		userId,
-		bson.M{"username": 1, "first_name": 1, "last_name": 1, "birthdate": 1},
+		username,
+		bson.M{"first_name": 1, "last_name": 1, "birthdate": 1},
 		nil,
 	)
 }
@@ -678,7 +679,7 @@ func (d *Database) DeleteUser(grpcCtx context.Context, userId string) error {
 			// Revoke all user's refresh tokens
 			_, err = d.authClient.RevokeRefreshTokens(
 				grpcCtx,
-				&pbauth.RevokeRefreshTokensRequest{},
+				&emptypb.Empty{},
 			)
 
 			return nil

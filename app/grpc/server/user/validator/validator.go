@@ -3,7 +3,7 @@ package validator
 import (
 	"context"
 	commongrpcvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/validator"
-	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/protobuf/compiled/user"
+	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/user"
 	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	"google.golang.org/grpc/codes"
 )
@@ -172,7 +172,7 @@ func (v Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) 
 	validations := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
-			"UserId": "user_id",
+			"Username": "username",
 		},
 	)
 
