@@ -271,12 +271,15 @@ func (d *Database) FindUser(
 		},
 	}
 
+	// Initialize the user variable
+	user = &commonmongodbuser.User{}
+
 	// Find the user
 	err = d.GetCollection(UserCollection).FindOne(
 		ctx,
 		filter,
 		findOptions,
-	).Decode(&user)
+	).Decode(user)
 	if err != nil {
 		return nil, err
 	}
@@ -570,6 +573,9 @@ func (d *Database) FindUserPhoneNumber(
 	// Create the find options
 	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
 
+	// Initialize the userPhoneNumber variable
+	userPhoneNumber = &commonmongodbuser.UserPhoneNumber{}
+
 	// Find the user's phone number
 	err = d.GetCollection(UserPhoneNumberCollection).FindOne(
 		ctx,
@@ -810,6 +816,9 @@ func (d *Database) FindUserEmail(
 	// Create the find options
 	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
 
+	// Initialize the userEmail variable
+	userEmail = &commonmongodbuser.UserEmail{}
+
 	// Find the user's email
 	err = d.GetCollection(UserEmailCollection).FindOne(
 		ctx,
@@ -927,6 +936,7 @@ func (d *Database) FindUserActiveEmails(
 
 	// Iterate through the cursor
 	for cur.Next(ctx) {
+		// Decode the user email
 		var userEmail commonmongodbuser.UserEmail
 		if err = cur.Decode(&userEmail); err != nil {
 			return nil, err
