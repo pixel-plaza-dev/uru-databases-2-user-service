@@ -254,7 +254,7 @@ func (d *Database) FindUser(
 	filter interface{},
 	projection interface{},
 	sort interface{},
-) (user *commonmongodbuser.User, err error) {
+) (*commonmongodbuser.User, error) {
 	// Set the default projection
 	if projection == nil {
 		projection = bson.M{"_id": 1}
@@ -272,10 +272,10 @@ func (d *Database) FindUser(
 	}
 
 	// Initialize the user variable
-	user = &commonmongodbuser.User{}
+	user := &commonmongodbuser.User{}
 
 	// Find the user
-	err = d.GetCollection(UserCollection).FindOne(
+	err := d.GetCollection(UserCollection).FindOne(
 		ctx,
 		filter,
 		findOptions,
@@ -564,7 +564,7 @@ func (d *Database) FindUserPhoneNumber(
 	filter interface{},
 	projection interface{},
 	sort interface{},
-) (userPhoneNumber *commonmongodbuser.UserPhoneNumber, err error) {
+) (*commonmongodbuser.UserPhoneNumber, error) {
 	// Set the default projection
 	if projection == nil {
 		projection = bson.M{"_id": 1}
@@ -574,10 +574,10 @@ func (d *Database) FindUserPhoneNumber(
 	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
 
 	// Initialize the userPhoneNumber variable
-	userPhoneNumber = &commonmongodbuser.UserPhoneNumber{}
+	userPhoneNumber := &commonmongodbuser.UserPhoneNumber{}
 
 	// Find the user's phone number
-	err = d.GetCollection(UserPhoneNumberCollection).FindOne(
+	err := d.GetCollection(UserPhoneNumberCollection).FindOne(
 		ctx,
 		filter,
 		findOptions,
@@ -807,7 +807,7 @@ func (d *Database) FindUserEmail(
 	filter interface{},
 	projection interface{},
 	sort interface{},
-) (userEmail *commonmongodbuser.UserEmail, err error) {
+) (*commonmongodbuser.UserEmail, error) {
 	// Set the default projection
 	if projection == nil {
 		projection = bson.M{"_id": 1}
@@ -817,10 +817,10 @@ func (d *Database) FindUserEmail(
 	findOptions := commonmongodb.PrepareFindOneOptions(projection, sort)
 
 	// Initialize the userEmail variable
-	userEmail = &commonmongodbuser.UserEmail{}
+	userEmail := &commonmongodbuser.UserEmail{}
 
 	// Find the user's email
-	err = d.GetCollection(UserEmailCollection).FindOne(
+	err := d.GetCollection(UserEmailCollection).FindOne(
 		ctx,
 		filter,
 		findOptions,
