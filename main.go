@@ -208,6 +208,7 @@ func main() {
 	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(
 		[]byte(jwtPublicKey),
 		tokenValidator,
+		commonflag.Mode,
 	)
 	if err != nil {
 		panic(err)
