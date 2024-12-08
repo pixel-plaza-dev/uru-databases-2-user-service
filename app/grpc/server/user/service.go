@@ -51,7 +51,7 @@ func NewServer(
 }
 
 // SignUp creates a new user
-func (s Server) SignUp(
+func (s *Server) SignUp(
 	ctx context.Context,
 	request *pbuser.SignUpRequest,
 ) (response *pbuser.SignUpResponse, err error) {
@@ -121,7 +121,7 @@ func (s Server) SignUp(
 	}, nil
 }
 
-func (s Server) IsPasswordCorrect(
+func (s *Server) IsPasswordCorrect(
 	ctx context.Context,
 	request *pbuser.IsPasswordCorrectRequest,
 ) (response *pbuser.IsPasswordCorrectResponse, err error) {
@@ -176,7 +176,7 @@ func (s Server) IsPasswordCorrect(
 }
 
 // UsernameExists checks if the username exists
-func (s Server) UsernameExists(
+func (s *Server) UsernameExists(
 	ctx context.Context,
 	request *pbuser.UsernameExistsRequest,
 ) (response *pbuser.UsernameExistsResponse, err error) {
@@ -213,7 +213,7 @@ func (s Server) UsernameExists(
 }
 
 // GetUserIdByUsername gets the user's ID by username
-func (s Server) GetUserIdByUsername(
+func (s *Server) GetUserIdByUsername(
 	ctx context.Context,
 	request *pbuser.GetUserIdByUsernameRequest,
 ) (response *pbuser.GetUserIdByUsernameResponse, err error) {
@@ -251,7 +251,7 @@ func (s Server) GetUserIdByUsername(
 }
 
 // GetUsernameByUserId gets the user's username by ID
-func (s Server) GetUsernameByUserId(
+func (s *Server) GetUsernameByUserId(
 	ctx context.Context,
 	request *pbuser.GetUsernameByUserIdRequest,
 ) (response *pbuser.GetUsernameByUserIdResponse, err error) {
@@ -289,7 +289,7 @@ func (s Server) GetUsernameByUserId(
 }
 
 // GetUserSharedIdByUserId gets the user's shared ID by user ID
-func (s Server) GetUserSharedIdByUserId(
+func (s *Server) GetUserSharedIdByUserId(
 	ctx context.Context,
 	request *pbuser.GetUserSharedIdByUserIdRequest,
 ) (response *pbuser.GetUserSharedIdByUserIdResponse, err error) {
@@ -327,7 +327,7 @@ func (s Server) GetUserSharedIdByUserId(
 }
 
 // GetUserIdByUserSharedId gets the user's ID by shared ID
-func (s Server) GetUserIdByUserSharedId(
+func (s *Server) GetUserIdByUserSharedId(
 	ctx context.Context,
 	request *pbuser.GetUserIdByUserSharedIdRequest,
 ) (response *pbuser.GetUserIdByUserSharedIdResponse, err error) {
@@ -365,7 +365,7 @@ func (s Server) GetUserIdByUserSharedId(
 }
 
 // GetProfile gets the user's profile
-func (s Server) GetProfile(
+func (s *Server) GetProfile(
 	ctx context.Context,
 	request *pbuser.GetProfileRequest,
 ) (response *pbuser.GetProfileResponse, err error) {
@@ -405,7 +405,7 @@ func (s Server) GetProfile(
 }
 
 // UpdateUser updates the user
-func (s Server) UpdateUser(
+func (s *Server) UpdateUser(
 	ctx context.Context,
 	request *pbuser.UpdateUserRequest,
 ) (response *pbuser.UpdateUserResponse, err error) {
@@ -455,7 +455,7 @@ func (s Server) UpdateUser(
 }
 
 // ChangeUsername changes the user's username
-func (s Server) ChangeUsername(
+func (s *Server) ChangeUsername(
 	ctx context.Context,
 	request *pbuser.ChangeUsernameRequest,
 ) (response *pbuser.ChangeUsernameResponse, err error) {
@@ -496,7 +496,7 @@ func (s Server) ChangeUsername(
 }
 
 // ChangePassword changes the user's password
-func (s Server) ChangePassword(
+func (s *Server) ChangePassword(
 	ctx context.Context,
 	request *pbuser.ChangePasswordRequest,
 ) (response *pbuser.ChangePasswordResponse, err error) {
@@ -562,7 +562,7 @@ func (s Server) ChangePassword(
 }
 
 // GetPhoneNumber gets the user's phone number
-func (s Server) GetPhoneNumber(
+func (s *Server) GetPhoneNumber(
 	ctx context.Context,
 	request *emptypb.Empty,
 ) (*pbuser.GetPhoneNumberResponse, error) {
@@ -593,7 +593,7 @@ func (s Server) GetPhoneNumber(
 }
 
 // ChangePhoneNumber changes the user's phone number
-func (s Server) ChangePhoneNumber(
+func (s *Server) ChangePhoneNumber(
 	ctx context.Context,
 	request *pbuser.ChangePhoneNumberRequest,
 ) (response *pbuser.ChangePhoneNumberResponse, err error) {
@@ -626,7 +626,7 @@ func (s Server) ChangePhoneNumber(
 }
 
 // AddEmail adds an email to the user's account
-func (s Server) AddEmail(
+func (s *Server) AddEmail(
 	ctx context.Context,
 	request *pbuser.AddEmailRequest,
 ) (response *pbuser.AddEmailResponse, err error) {
@@ -666,7 +666,7 @@ func (s Server) AddEmail(
 }
 
 // DeleteEmail deletes an email from the user's account
-func (s Server) DeleteEmail(
+func (s *Server) DeleteEmail(
 	ctx context.Context,
 	request *pbuser.DeleteEmailRequest,
 ) (response *pbuser.DeleteEmailResponse, err error) {
@@ -710,7 +710,7 @@ func (s Server) DeleteEmail(
 }
 
 // GetPrimaryEmail gets the user's primary email
-func (s Server) GetPrimaryEmail(
+func (s *Server) GetPrimaryEmail(
 	ctx context.Context,
 	request *emptypb.Empty,
 ) (*pbuser.GetPrimaryEmailResponse, error) {
@@ -741,7 +741,7 @@ func (s Server) GetPrimaryEmail(
 }
 
 // ChangePrimaryEmail changes the user's primary email
-func (s Server) ChangePrimaryEmail(
+func (s *Server) ChangePrimaryEmail(
 	ctx context.Context,
 	request *pbuser.ChangePrimaryEmailRequest,
 ) (response *pbuser.ChangePrimaryEmailResponse, err error) {
@@ -781,7 +781,7 @@ func (s Server) ChangePrimaryEmail(
 }
 
 // GetActiveEmails gets the user's active emails
-func (s Server) GetActiveEmails(
+func (s *Server) GetActiveEmails(
 	ctx context.Context,
 	request *emptypb.Empty,
 ) (*pbuser.GetActiveEmailsResponse, error) {
@@ -812,7 +812,7 @@ func (s Server) GetActiveEmails(
 }
 
 // DeleteUser deletes the user's account
-func (s Server) DeleteUser(
+func (s *Server) DeleteUser(
 	ctx context.Context,
 	request *pbuser.DeleteUserRequest,
 ) (response *pbuser.DeleteUserResponse, err error) {
@@ -871,7 +871,7 @@ func (s Server) DeleteUser(
 }
 
 // GetMyProfile gets the user's profile
-func (s Server) GetMyProfile(
+func (s *Server) GetMyProfile(
 	ctx context.Context,
 	request *emptypb.Empty,
 ) (response *pbuser.GetMyProfileResponse, err error) {
@@ -907,7 +907,7 @@ func (s Server) GetMyProfile(
 // --- Requires more development ---
 
 // SendVerificationEmail sends a verification email to the user
-func (s Server) SendVerificationEmail(
+func (s *Server) SendVerificationEmail(
 	ctx context.Context,
 	request *pbuser.SendVerificationEmailRequest,
 ) (*pbuser.SendVerificationEmailResponse, error) {
@@ -915,7 +915,7 @@ func (s Server) SendVerificationEmail(
 }
 
 // VerifyEmail verifies the user's email
-func (s Server) VerifyEmail(
+func (s *Server) VerifyEmail(
 	ctx context.Context,
 	request *pbuser.VerifyEmailRequest,
 ) (*pbuser.VerifyEmailResponse, error) {
@@ -923,7 +923,7 @@ func (s Server) VerifyEmail(
 }
 
 // VerifyPhoneNumber verifies the user's phone number
-func (s Server) VerifyPhoneNumber(
+func (s *Server) VerifyPhoneNumber(
 	ctx context.Context,
 	request *pbuser.VerifyPhoneNumberRequest,
 ) (*pbuser.VerifyPhoneNumberResponse, error) {
@@ -931,7 +931,7 @@ func (s Server) VerifyPhoneNumber(
 }
 
 // SendVerificationSMS sends a verification SMS to the user
-func (s Server) SendVerificationSMS(
+func (s *Server) SendVerificationSMS(
 	ctx context.Context,
 	request *pbuser.SendVerificationSMSRequest,
 ) (*pbuser.SendVerificationSMSResponse, error) {
@@ -939,7 +939,7 @@ func (s Server) SendVerificationSMS(
 }
 
 // ForgotPassword sends a password reset link to the user's email
-func (s Server) ForgotPassword(
+func (s *Server) ForgotPassword(
 	ctx context.Context,
 	request *pbuser.ForgotPasswordRequest,
 ) (*pbuser.ForgotPasswordResponse, error) {
@@ -947,7 +947,7 @@ func (s Server) ForgotPassword(
 }
 
 // ResetPassword resets the user's password
-func (s Server) ResetPassword(
+func (s *Server) ResetPassword(
 	ctx context.Context,
 	request *pbuser.ResetPasswordRequest,
 ) (*pbuser.ResetPasswordResponse, error) {

@@ -17,7 +17,9 @@ import (
 	commontls "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/tls"
 	pbauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/auth"
 	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/user"
+	pbconfigauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/config/grpc/auth"
 	pbconfiguser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/config/grpc/user"
+	pbtypesgrpc "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/types/grpc"
 	appmongodb "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
@@ -77,14 +79,15 @@ func main() {
 	applogger.Environment.EnvironmentVariableLoaded(userdatabase.DbNameKey)
 
 	// Get the gRPC services URI
+	var uriKeys = []string{appgrpc.AuthServiceUriKey}
 	var uris = make(map[string]string)
-	for _, key := range []string{appgrpc.AuthServiceUriKey} {
-		uri, err := commonenv.LoadVariable(key)
+	for _, uriKey := range uriKeys {
+		uri, err := commonenv.LoadVariable(uriKey)
 		if err != nil {
 			panic(err)
 		}
-		applogger.Environment.EnvironmentVariableLoaded(key)
-		uris[key] = uri
+		applogger.Environment.EnvironmentVariableLoaded(uriKey)
+		uris[uriKey] = uri
 	}
 
 	// Get the JWT public key
@@ -102,14 +105,14 @@ func main() {
 
 	// Get the service account token source for each gRPC server URI
 	var tokenSources = make(map[string]*oauth.TokenSource)
-	for key, uri := range uris {
+	for _, uriKey := range uriKeys {
 		tokenSource, err := commongcloud.LoadServiceAccountCredentials(
-			context.Background(), "https://"+uri, googleCredentials,
+			context.Background(), "https://"+uris[uriKey], googleCredentials,
 		)
 		if err != nil {
 			panic(err)
 		}
-		tokenSources[key] = tokenSource
+		tokenSources[uriKey] = tokenSource
 	}
 
 	// Get the MongoDB configuration
@@ -149,27 +152,32 @@ func main() {
 		}
 	}
 
+	// Create gRPC interceptions map
+	var grpcInterceptions = map[string]*map[pbtypesgrpc.Method]pbtypesgrpc.Interception{
+		appgrpc.AuthServiceUriKey: &pbconfigauth.Interceptions,
+	}
+
 	// Create client authentication interceptors
-	var clientAuthInterceptors = make(map[string]*clientauth.Interceptor)
-	for key, tokenSource := range tokenSources {
-		clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSource)
+	var clientAuthInterceptors = make(map[string]clientauth.Authentication)
+	for _, uriKey := range uriKeys {
+		clientAuthInterceptor, err := clientauth.NewInterceptor(tokenSources[uriKey], grpcInterceptions[uriKey])
 		if err != nil {
 			panic(err)
 		}
-		clientAuthInterceptors[key] = clientAuthInterceptor
+		clientAuthInterceptors[uriKey] = clientAuthInterceptor
 	}
 
 	// Create gRPC connections
 	var conns = make(map[string]*grpc.ClientConn)
-	for key, uri := range uris {
+	for _, uriKey := range uriKeys {
 		conn, err := grpc.NewClient(
-			uri, grpc.WithTransportCredentials(transportCredentials),
-			grpc.WithChainUnaryInterceptor(clientAuthInterceptors[key].Authenticate()),
+			uris[uriKey], grpc.WithTransportCredentials(transportCredentials),
+			grpc.WithChainUnaryInterceptor(clientAuthInterceptors[uriKey].Authenticate()),
 		)
 		if err != nil {
 			panic(err)
 		}
-		conns[key] = conn
+		conns[uriKey] = conn
 	}
 	defer func(conns map[string]*grpc.ClientConn) {
 		for _, conn := range conns {
