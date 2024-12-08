@@ -4,24 +4,32 @@ import (
 	"context"
 	commongrpcvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/http/grpc/server/validator"
 	pbuser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/compiled/pixel_plaza/user"
-	mongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
+	appmongodbuser "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	"google.golang.org/grpc/codes"
 )
 
 type (
 	// Validator is the default validator for the user service gRPC methods
 	Validator struct {
-		userDatabase *mongodbuser.Database
+		userDatabase *appmongodbuser.Database
 		validator    commongrpcvalidator.Validator
 	}
 )
 
 // NewValidator creates a new validator
 func NewValidator(
-	userDatabase *mongodbuser.Database,
+	userDatabase *appmongodbuser.Database,
 	validator commongrpcvalidator.Validator,
-) *Validator {
-	return &Validator{userDatabase: userDatabase, validator: validator}
+) (*Validator, error) {
+	// Check if either the user database or the validator is nil
+	if userDatabase == nil {
+		return nil, appmongodbuser.NilDatabaseError
+	}
+	if validator == nil {
+		return nil, commongrpcvalidator.NilValidatorError
+	}
+
+	return &Validator{userDatabase: userDatabase, validator: validator}, nil
 }
 
 // UsernameExists checks if the username exists
@@ -51,7 +59,7 @@ func (v Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
 	birthdateField := "birthdate"
 
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Password":    "password",
@@ -90,7 +98,7 @@ func (v Validator) ValidateSignUpRequest(request *pbuser.SignUpRequest) error {
 // ValidateIsPasswordCorrectRequest validates the is password correct request
 func (v Validator) ValidateIsPasswordCorrectRequest(request *pbuser.IsPasswordCorrectRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
@@ -104,7 +112,7 @@ func (v Validator) ValidateIsPasswordCorrectRequest(request *pbuser.IsPasswordCo
 // ValidateUsernameExistsRequest validates the username exists request
 func (v Validator) ValidateUsernameExistsRequest(request *pbuser.UsernameExistsRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
@@ -117,7 +125,7 @@ func (v Validator) ValidateUsernameExistsRequest(request *pbuser.UsernameExistsR
 // ValidateGetUserIdByUsernameRequest validates the get user ID by username request
 func (v Validator) ValidateGetUserIdByUsernameRequest(request *pbuser.GetUserIdByUsernameRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
@@ -130,7 +138,7 @@ func (v Validator) ValidateGetUserIdByUsernameRequest(request *pbuser.GetUserIdB
 // ValidateGetUsernameByUserIdRequest validates the get username by user ID request
 func (v Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernameByUserIdRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserId": "user_id",
@@ -143,7 +151,7 @@ func (v Validator) ValidateGetUsernameByUserIdRequest(request *pbuser.GetUsernam
 // ValidateGetUserSharedIdByUserIdRequest validates the get user shared ID by user ID request
 func (v Validator) ValidateGetUserSharedIdByUserIdRequest(request *pbuser.GetUserSharedIdByUserIdRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserId": "user_id",
@@ -156,7 +164,7 @@ func (v Validator) ValidateGetUserSharedIdByUserIdRequest(request *pbuser.GetUse
 // ValidateGetUserIdByUserSharedIdRequest validates the get user ID by user shared ID request
 func (v Validator) ValidateGetUserIdByUserSharedIdRequest(request *pbuser.GetUserIdByUserSharedIdRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"UserSharedId": "user_shared_id",
@@ -169,7 +177,7 @@ func (v Validator) ValidateGetUserIdByUserSharedIdRequest(request *pbuser.GetUse
 // ValidateGetProfileRequest validates the get profile request
 func (v Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
@@ -182,7 +190,7 @@ func (v Validator) ValidateGetProfileRequest(request *pbuser.GetProfileRequest) 
 // ValidateChangeUsernameRequest validates the change username request
 func (v Validator) ValidateChangeUsernameRequest(request *pbuser.ChangeUsernameRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Username": "username",
@@ -195,7 +203,7 @@ func (v Validator) ValidateChangeUsernameRequest(request *pbuser.ChangeUsernameR
 // ValidateChangePasswordRequest validates the change password request
 func (v Validator) ValidateChangePasswordRequest(request *pbuser.ChangePasswordRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"OldPassword": "old_password",
@@ -217,7 +225,7 @@ func (v Validator) ValidateChangePasswordRequest(request *pbuser.ChangePasswordR
 // ValidateChangePhoneNumberRequest validates the change phone number request
 func (v Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneNumberRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"PhoneNumber": "phone_number",
@@ -230,7 +238,7 @@ func (v Validator) ValidateChangePhoneNumberRequest(request *pbuser.ChangePhoneN
 // ValidateDeleteUserRequest validates the delete user request
 func (v Validator) ValidateDeleteUserRequest(request *pbuser.DeleteUserRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Password": "password",
@@ -243,7 +251,7 @@ func (v Validator) ValidateDeleteUserRequest(request *pbuser.DeleteUserRequest) 
 // ValidateAddEmailRequest validates the add email request
 func (v Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",
@@ -259,7 +267,7 @@ func (v Validator) ValidateAddEmailRequest(request *pbuser.AddEmailRequest) erro
 // ValidateChangePrimaryEmailRequest validates the change primary email request
 func (v Validator) ValidateChangePrimaryEmailRequest(request *pbuser.ChangePrimaryEmailRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",
@@ -275,7 +283,7 @@ func (v Validator) ValidateChangePrimaryEmailRequest(request *pbuser.ChangePrima
 // ValidateDeleteEmailRequest validates the delete email request
 func (v Validator) ValidateDeleteEmailRequest(request *pbuser.DeleteEmailRequest) error {
 	// Get validations from fields to validate
-	validations := v.validator.ValidateNonEmptyStringFields(
+	validations, _ := v.validator.ValidateNonEmptyStringFields(
 		request,
 		&map[string]string{
 			"Email": "email",

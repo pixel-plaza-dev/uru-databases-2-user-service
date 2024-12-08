@@ -27,9 +27,9 @@ import (
 type Server struct {
 	userDatabase       *appmongodbuser.Database
 	authClient         pbauth.AuthClient
-	logger             Logger
+	logger             *Logger
 	validator          *userservervalidator.Validator
-	jwtValidatorLogger commonjwtvalidator.Logger
+	jwtValidatorLogger *commonjwtvalidator.Logger
 	pbuser.UnimplementedUserServer
 }
 
@@ -37,9 +37,9 @@ type Server struct {
 func NewServer(
 	userDatabase *appmongodbuser.Database,
 	authClient pbauth.AuthClient,
-	logger Logger,
+	logger *Logger,
 	validator *userservervalidator.Validator,
-	jwtValidatorLogger commonjwtvalidator.Logger,
+	jwtValidatorLogger *commonjwtvalidator.Logger,
 ) *Server {
 	return &Server{
 		userDatabase:       userDatabase,

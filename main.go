@@ -119,7 +119,10 @@ func main() {
 	}
 
 	// Get the connection handler
-	mongodbConnection := commonmongodb.NewDefaultConnectionHandler(mongoDbConfig)
+	mongodbConnection, err := commonmongodb.NewDefaultConnectionHandler(mongoDbConfig)
+	if err != nil {
+		panic(err)
+	}
 
 	// Connect to MongoDB and get the client
 	mongodbClient, err := mongodbConnection.Connect()
@@ -198,14 +201,14 @@ func main() {
 
 	// Create token validator
 	tokenValidator, err := commonjwtvalidatorgrpc.NewDefaultTokenValidator(
-		tokenSources[appgrpc.AuthServiceUriKey], &authClient, nil,
+		tokenSources[appgrpc.AuthServiceUriKey], authClient, nil,
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create JWT validator
-	jwtValidator, err := commonjwtvalidator.NewDefaultValidator(
+	// Create JWT validator with ED25519 public key
+	jwtValidator, err := commonjwtvalidator.NewEd25519Validator(
 		[]byte(jwtPublicKey),
 		tokenValidator,
 		commonflag.Mode,
@@ -235,10 +238,13 @@ func main() {
 	serverValidator := commongrpcvalidator.NewDefaultValidator()
 
 	// Create the gRPC user server validator
-	userServerValidator := userservervalidator.NewValidator(
+	userServerValidator, err := userservervalidator.NewValidator(
 		userDatabase,
 		serverValidator,
 	)
+	if err != nil {
+		panic(err)
+	}
 
 	// Create the gRPC user server
 	userServer := userserver.NewServer(
