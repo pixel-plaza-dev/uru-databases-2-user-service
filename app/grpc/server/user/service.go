@@ -2,7 +2,6 @@ package user
 
 import (
 	"errors"
-	"github.com/google/uuid"
 	commonbcrypt "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/bcrypt"
 	commonjwtvalidator "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/crypto/jwt/validator"
 	commonuser "github.com/pixel-plaza-dev/uru-databases-2-go-service-common/database/mongodb/model/user"
@@ -78,7 +77,6 @@ func (s *Server) SignUp(
 		LastName:       request.GetLastName(),
 		HashedPassword: hashedPassword,
 		JoinedAt:       currentTime,
-		UUID:           uuid.New().String(),
 	}
 
 	// Add the birthdate if it exists
@@ -169,9 +167,8 @@ func (s *Server) IsPasswordCorrect(
 	s.logger.PasswordIsCorrect(userId)
 
 	return &pbuser.IsPasswordCorrectResponse{
-		Message:      PasswordIsCorrect,
-		UserId:       userId,
-		UserSharedId: user.UUID,
+		Message: PasswordIsCorrect,
+		UserId:  userId,
 	}, nil
 }
 
@@ -285,82 +282,6 @@ func (s *Server) GetUsernameByUserId(
 	return &pbuser.GetUsernameByUserIdResponse{
 		Message:  FoundByUserId,
 		Username: username,
-	}, nil
-}
-
-// GetUserSharedIdByUserId gets the user's shared ID by user ID
-func (s *Server) GetUserSharedIdByUserId(
-	ctx context.Context,
-	request *pbuser.GetUserSharedIdByUserIdRequest,
-) (response *pbuser.GetUserSharedIdByUserIdResponse, err error) {
-	// Validate the request
-	if err = s.validator.ValidateGetUserSharedIdByUserIdRequest(request); err != nil {
-		s.logger.FailedToGetUserSharedIdByUserId(err)
-		return nil, err
-	}
-
-	// Get the user shared ID by user ID
-	userSharedId, err := s.userDatabase.GetUserSharedIdByUserId(
-		context.Background(),
-		request.GetUserId(),
-	)
-	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
-		s.logger.FailedToGetUserSharedIdByUserId(err)
-		return nil, InternalServerError
-	}
-
-	// Check if the user shared ID doesn't exist
-	if err != nil {
-		// User ID does not exist
-		s.logger.UserNotFoundByUserId(request.GetUserId())
-
-		return nil, status.Error(codes.NotFound, NotFoundByUserId)
-	}
-
-	// User shared ID found by user ID
-	s.logger.UserSharedIdFoundByUserId(request.GetUserId(), userSharedId)
-
-	return &pbuser.GetUserSharedIdByUserIdResponse{
-		Message:      FoundByUserId,
-		UserSharedId: userSharedId,
-	}, nil
-}
-
-// GetUserIdByUserSharedId gets the user's ID by shared ID
-func (s *Server) GetUserIdByUserSharedId(
-	ctx context.Context,
-	request *pbuser.GetUserIdByUserSharedIdRequest,
-) (response *pbuser.GetUserIdByUserSharedIdResponse, err error) {
-	// Validate the request
-	if err = s.validator.ValidateGetUserIdByUserSharedIdRequest(request); err != nil {
-		s.logger.FailedToGetUserIdByUserSharedId(err)
-		return nil, err
-	}
-
-	// Get the user ID by shared ID
-	userId, err := s.userDatabase.GetUserIdByUserSharedId(
-		context.Background(),
-		request.GetUserSharedId(),
-	)
-	if err != nil && !errors.Is(mongo.ErrNoDocuments, err) {
-		s.logger.FailedToGetUserIdByUserSharedId(err)
-		return nil, InternalServerError
-	}
-
-	// Check if the user shared ID doesn't exist
-	if err != nil {
-		// User shared ID does not exist
-		s.logger.UserNotFoundBySharedId(request.GetUserSharedId())
-
-		return nil, status.Error(codes.NotFound, NotFoundByUserSharedId)
-	}
-
-	// User found by user shared ID
-	s.logger.UserFoundBySharedId(request.GetUserSharedId(), userId)
-
-	return &pbuser.GetUserIdByUserSharedIdResponse{
-		Message: FoundByUserSharedId,
-		UserId:  userId,
 	}, nil
 }
 
@@ -905,6 +826,13 @@ func (s *Server) GetMyProfile(
 }
 
 // --- Requires more development ---
+
+func (s *Server) SetProfilePicture(
+	ctx context.Context,
+	request *pbuser.SetProfilePictureRequest,
+) (*pbuser.SetProfilePictureResponse, error) {
+	return nil, InDevelopmentError
+}
 
 // SendVerificationEmail sends a verification email to the user
 func (s *Server) SendVerificationEmail(

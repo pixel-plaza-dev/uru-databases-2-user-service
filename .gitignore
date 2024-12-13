@@ -25,3 +25,6 @@
 # Service account keys
 /iam
 /**/service-account.json
+
+# Swagger files
+# /docs

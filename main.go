@@ -20,6 +20,7 @@ import (
 	pbconfigauth "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/config/grpc/auth"
 	pbconfiguser "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/config/grpc/user"
 	pbtypesgrpc "github.com/pixel-plaza-dev/uru-databases-2-protobuf-common/types/grpc"
+	"github.com/pixel-plaza-dev/uru-databases-2-user-service/app"
 	appmongodb "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb"
 	userdatabase "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/database/mongodb/user"
 	appgrpc "github.com/pixel-plaza-dev/uru-databases-2-user-service/app/grpc"
@@ -43,7 +44,7 @@ func init() {
 	applogger.Flag.ModeFlagSet(commonflag.Mode)
 
 	// Check if the environment is production
-	if commonflag.Mode.IsProd() {
+	if commonflag.Mode != nil && commonflag.Mode.IsProd() {
 		return
 	}
 
@@ -136,16 +137,16 @@ func main() {
 	// Load transport credentials
 	var transportCredentials credentials.TransportCredentials
 
-	if commonflag.Mode.IsDev() {
+	if commonflag.Mode != nil && commonflag.Mode.IsDev() {
 		// Load server TLS credentials
 		transportCredentials, err = credentials.NewServerTLSFromFile(
-			appgrpc.ServerCertPath, appgrpc.ServerKeyPath,
+			app.ServerCertPath, app.ServerKeyPath,
 		)
 		if err != nil {
 			panic(err)
 		}
 	} else {
-		// Load system certificates pool
+		// Load system certificates
 		transportCredentials, err = commontls.LoadSystemCredentials()
 		if err != nil {
 			panic(err)
@@ -243,7 +244,7 @@ func main() {
 	)
 
 	// Create the gRPC server validator
-	serverValidator := commongrpcvalidator.NewDefaultValidator()
+	serverValidator := commongrpcvalidator.NewDefaultValidator(commonflag.Mode)
 
 	// Create the gRPC user server validator
 	userServerValidator, err := userservervalidator.NewValidator(
