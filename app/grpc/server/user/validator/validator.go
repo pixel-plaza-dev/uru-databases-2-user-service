@@ -18,7 +18,7 @@ type (
 	}
 )
 
-// StructFieldsToValidate
+// Fields to validate for each gRPC method
 var (
 	SignUpRequestFieldsToValidate, _ = commonvalidatorfields.CreateGRPCStructFieldsToValidate(
 		&pbuser.SignUpRequest{},

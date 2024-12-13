@@ -111,41 +111,6 @@ func (l *Logger) UserNotFoundByUserId(userId string) {
 	)
 }
 
-// UserFoundBySharedId logs the user retrieval success
-func (l *Logger) UserFoundBySharedId(sharedId string, userId string) {
-	l.logger.LogMessage(
-		commonlogger.NewLogMessage(
-			"User found by shared ID",
-			commonlogger.StatusSuccess,
-			sharedId,
-			userId,
-		),
-	)
-}
-
-// UserNotFoundBySharedId logs the user retrieval failure
-func (l *Logger) UserNotFoundBySharedId(sharedId string) {
-	l.logger.LogMessage(
-		commonlogger.NewLogMessage(
-			"User not found by shared ID",
-			commonlogger.StatusFailed,
-			sharedId,
-		),
-	)
-}
-
-// UserSharedIdFoundByUserId logs the user shared ID retrieval success
-func (l *Logger) UserSharedIdFoundByUserId(userId string, userSharedId string) {
-	l.logger.LogMessage(
-		commonlogger.NewLogMessage(
-			"User shared ID found by user ID",
-			commonlogger.StatusSuccess,
-			userId,
-			userSharedId,
-		),
-	)
-}
-
 // UsernameExists logs the username check success
 func (l *Logger) UsernameExists(username string) {
 	l.logger.LogMessage(
@@ -182,26 +147,6 @@ func (l *Logger) FailedToGetUserIdByUsername(err error) {
 	l.logger.LogError(
 		commonlogger.NewLogError(
 			"Failed to get user ID by username",
-			err,
-		),
-	)
-}
-
-// FailedToGetUserSharedIdByUserId logs the user shared ID retrieval failure
-func (l *Logger) FailedToGetUserSharedIdByUserId(err error) {
-	l.logger.LogError(
-		commonlogger.NewLogError(
-			"Failed to get user shared ID by user ID",
-			err,
-		),
-	)
-}
-
-// FailedToGetUserIdByUserSharedId logs the user ID retrieval failure
-func (l *Logger) FailedToGetUserIdByUserSharedId(err error) {
-	l.logger.LogError(
-		commonlogger.NewLogError(
-			"Failed to get user ID by user shared ID",
 			err,
 		),
 	)
