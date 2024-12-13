@@ -34,7 +34,6 @@ func NewDatabase(
 
 	for _, collection := range []*commonmongodb.Collection{
 		UserCollection,
-		UserSharedIdentifierCollection,
 		UserEmailCollection,
 		UserPhoneNumberCollection,
 		UserUsernameLogCollection,
@@ -325,22 +324,6 @@ func (d *Database) FindUserByUserId(
 	return d.FindUser(ctx, bson.M{"_id": *userObjectId}, projection, sort)
 }
 
-// FindUserBySharedUserId finds a user by the shared user ID
-func (d *Database) FindUserBySharedUserId(
-	ctx context.Context,
-	sharedUserId string,
-	projection interface{},
-	sort interface{},
-) (user *commonmongodbuser.User, err error) {
-	// Check if the shared user ID is empty
-	if sharedUserId == "" {
-		return nil, mongo.ErrNoDocuments
-	}
-
-	// Find the user
-	return d.FindUser(ctx, bson.M{"uuid": sharedUserId}, projection, sort)
-}
-
 // GetUserHashedPassword gets the user's hashed password
 func (d *Database) GetUserHashedPassword(
 	ctx context.Context,
@@ -520,42 +503,6 @@ func (d *Database) GetUserProfile(
 		bson.M{"first_name": 1, "last_name": 1, "birthdate": 1},
 		nil,
 	)
-}
-
-// GetUserSharedIdByUserId gets the user's shared identifier by the user ID
-func (d *Database) GetUserSharedIdByUserId(
-	ctx context.Context,
-	userId string,
-) (userSharedId string, err error) {
-	// Get the user's shared identifier
-	user, err := d.FindUserByUserId(
-		ctx,
-		userId,
-		bson.M{"uuid": 1},
-		nil,
-	)
-	if err != nil {
-		return "", err
-	}
-	return user.UUID, nil
-}
-
-// GetUserIdByUserSharedId gets the user ID by the user shared ID
-func (d *Database) GetUserIdByUserSharedId(
-	ctx context.Context,
-	userSharedId string,
-) (userId string, err error) {
-	// Find the user ID by the user shared ID
-	user, err := d.FindUserBySharedUserId(
-		ctx,
-		userSharedId,
-		bson.M{"_id": 1},
-		nil,
-	)
-	if err != nil {
-		return "", err
-	}
-	return user.ID.Hex(), nil
 }
 
 // FindUserPhoneNumber finds a user's phone number
